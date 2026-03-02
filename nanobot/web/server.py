@@ -24,6 +24,72 @@ STATIC_DIR = Path(__file__).parent / "static"
 _PUBLIC_PATHS = {"/api/auth/login", "/api/auth/register"}
 _PUBLIC_PREFIXES = ("/login.html", "/style.css")
 
+# Prompt for skills WITH existing Python code
+_LOGIC_PROMPT_WITH_CODE = """\
+Analyze the following nanobot skill and generate a **logic pipeline** document.
+
+## SKILL.md
+```
+{skill_content}
+```
+
+## Python / Shell Scripts
+{scripts_section}
+
+Generate a concise LOGIC.md describing the execution pipeline:
+
+# Running Logic
+
+## Entry Point
+- The primary class/function and how it is triggered
+
+## Pipeline
+1. Step-by-step execution flow (numbered)
+2. Key method calls, data transformations, decision points
+3. Show the flow as: Input → Process → Output
+
+## Dependencies
+- External libraries, tools, APIs, or environment variables required
+
+Write ONLY the markdown content. Do not wrap in code fences.\
+"""
+
+# Prompt for skills WITHOUT Python code — instruct py-writer style reconstruction
+_LOGIC_PROMPT_NO_CODE = """\
+Analyze the following nanobot skill and generate a **logic pipeline** document.
+
+This skill currently has NO Python implementation. Describe its execution logic \
+as if it were implemented following the py-writer class-centric pattern \
+(one primary class, module-level functions delegate to the class).
+
+## SKILL.md
+```
+{skill_content}
+```
+
+Generate a concise LOGIC.md that reconstructs the skill's logic pipeline:
+
+# Running Logic
+
+## Entry Point
+- How the skill is triggered (user message, always-on injection, tool call)
+- What the hypothetical primary class would be named and how it is instantiated
+
+## Pipeline
+1. Step-by-step execution flow (numbered)
+2. For each step describe: trigger → action → output
+3. Include tool calls, external commands, or API requests the skill instructs
+
+## Dependencies
+- External tools (CLI binaries), APIs, environment variables, or services required
+
+## Reconstructed Class Design
+- Primary class name and constructor parameters
+- Key public methods and their responsibilities
+
+Write ONLY the markdown content. Do not wrap in code fences.\
+"""
+
 
 def create_app(
     agent: AgentLoop,
@@ -41,20 +107,13 @@ def create_app(
     async def auth_middleware(request: Request, call_next):
         path = request.url.path
 
-        # Public paths — always allowed
         if auth is None or path in _PUBLIC_PATHS or path.startswith(_PUBLIC_PREFIXES):
             return await call_next(request)
 
-        # Static assets at root that aren't pages (css/js) — allow
-        # Let login.html and API auth endpoints through; block everything else
         if path.startswith("/api/"):
             token = request.headers.get("Authorization", "").removeprefix("Bearer ").strip()
             if not auth.verify_token(token):
                 return JSONResponse({"detail": "unauthorized"}, status_code=401)
-        else:
-            # For HTML pages (except login.html), let the browser load them.
-            # The JS on each page will check auth and redirect to login if needed.
-            pass
 
         return await call_next(request)
 
@@ -73,7 +132,6 @@ def create_app(
             raise HTTPException(status_code=400, detail="username and password required")
 
         if auth is None:
-            # No auth configured — registration is a no-op, return a dummy token
             return {"token": "no-auth", "username": username}
 
         token = auth.register(username, password, invite_code)
@@ -191,6 +249,8 @@ def create_app(
         if skill_dir and (skill_dir / "LOGIC.md").exists():
             logic_content = (skill_dir / "LOGIC.md").read_text(encoding="utf-8")
 
+        has_python = bool(skill_dir and list(skill_dir.rglob("*.py")))
+
         return {
             "name": name,
             "description": meta.get("description", name),
@@ -199,6 +259,7 @@ def create_app(
             "always_on": always_on,
             "content": content,
             "logic": logic_content,
+            "has_python": has_python,
         }
 
     @app.post("/api/skills/{name}/generate-logic")
@@ -211,6 +272,7 @@ def create_app(
         if not skill_content:
             raise HTTPException(status_code=404, detail="skill not found")
 
+        # Collect scripts in the skill directory
         scripts: list[str] = []
         for ext in ("*.py", "*.sh"):
             for f in skill_dir.rglob(ext):
@@ -220,20 +282,17 @@ def create_app(
                 except Exception:
                     pass
 
-        prompt = (
-            "Generate a LOGIC.md document for the following nanobot skill. "
-            "The document should describe:\n"
-            "1. **Entry Point** — how the skill is triggered\n"
-            "2. **Flow** — step-by-step execution pipeline\n"
-            "3. **Dependencies** — external tools or APIs needed\n\n"
-            f"## SKILL.md\n```\n{skill_content}\n```\n\n"
-        )
-        if scripts:
-            prompt += "## Scripts\n" + "\n\n".join(scripts) + "\n\n"
-        prompt += (
-            "Write ONLY the LOGIC.md content in markdown. "
-            "Do not wrap in code fences."
-        )
+        has_code = bool(scripts)
+
+        if has_code:
+            prompt = _LOGIC_PROMPT_WITH_CODE.format(
+                skill_content=skill_content,
+                scripts_section="\n\n".join(scripts),
+            )
+        else:
+            prompt = _LOGIC_PROMPT_NO_CODE.format(
+                skill_content=skill_content,
+            )
 
         result = await agent.process_direct(
             prompt,

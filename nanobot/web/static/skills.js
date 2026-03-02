@@ -1,4 +1,4 @@
-/* nanobot skills dashboard */
+/* nanobot skills dashboard — logic pipeline view */
 (function () {
     // -- Auth guard -----------------------------------------------------
     var token = localStorage.getItem("nanobot_token");
@@ -16,6 +16,8 @@
 
     var allSkills = [];
     var activeCard = null;
+    // Track which skill is currently shown so refresh works correctly
+    var currentSkillName = null;
 
     // -- Helpers --------------------------------------------------------
 
@@ -57,11 +59,12 @@
             badges += badge(s.source, s.source === "builtin" ? "bg-purple-800 text-purple-200" : "bg-green-800 text-green-200");
             if (s.always_on) badges += " " + badge("always-on", "bg-yellow-800 text-yellow-200");
             if (!s.available) badges += " " + badge("unavailable", "bg-red-900 text-red-300");
+            if (s.has_logic) badges += " " + badge("pipeline", "bg-blue-800 text-blue-200");
 
             card.innerHTML =
                 '<div class="font-semibold text-gray-100">' + s.name + '</div>' +
                 '<div class="text-sm text-gray-400 mt-1 line-clamp-2">' + (s.description || "") + '</div>' +
-                '<div class="flex gap-1 mt-2">' + badges + '</div>';
+                '<div class="flex gap-1 mt-2 flex-wrap">' + badges + '</div>';
 
             card.addEventListener("click", function () {
                 if (activeCard) activeCard.classList.remove("active");
@@ -74,9 +77,10 @@
         });
     }
 
-    // -- Load skill detail ----------------------------------------------
+    // -- Load skill detail (logic pipeline view) ------------------------
 
     async function loadDetail(name) {
+        currentSkillName = name;
         detailPanel.classList.remove("hidden");
         detailPanel.classList.add("flex");
         detailEmpty.classList.add("hidden");
@@ -87,47 +91,84 @@
                 headers: authHeaders(),
             });
             if (handleUnauthorized(resp)) return;
-            if (!resp.ok) { detailContent.innerHTML = '<div class="text-red-400">Failed to load skill.</div>'; return; }
+            if (!resp.ok) {
+                detailContent.innerHTML = '<div class="text-red-400">Failed to load skill.</div>';
+                return;
+            }
             var data = await resp.json();
 
             detailName.textContent = data.name;
             detailDesc.textContent = data.description || "";
 
+            // Badges
             var badges = "";
             badges += badge(data.source, data.source === "builtin" ? "bg-purple-800 text-purple-200" : "bg-green-800 text-green-200");
             if (data.always_on) badges += " " + badge("always-on", "bg-yellow-800 text-yellow-200");
             if (!data.available) badges += " " + badge("unavailable", "bg-red-900 text-red-300");
+            if (data.has_python) badges += " " + badge("python", "bg-emerald-800 text-emerald-200");
+            else badges += " " + badge("markdown-only", "bg-gray-600 text-gray-300");
             detailBadges.innerHTML = badges;
 
-            var html = '<h2 class="text-lg font-bold mb-3">SKILL.md</h2>' + renderMarkdown(data.content || "");
+            // Build the detail view
+            var html = "";
 
             if (data.logic) {
-                html += '<hr class="my-6 border-gray-700">';
-                html += '<h2 class="text-lg font-bold mb-3">LOGIC.md</h2>' + renderMarkdown(data.logic);
+                // Show cached logic pipeline + refresh button
+                html += _pipelineHeader(true);
+                html += '<div class="pipeline-content">' + renderMarkdown(data.logic) + '</div>';
             } else {
-                html += '<hr class="my-6 border-gray-700">';
-                html += '<div class="flex items-center gap-3">';
-                html += '<span class="text-gray-500">No LOGIC.md found.</span>';
-                html += '<button id="gen-logic-btn" class="bg-blue-600 hover:bg-blue-500 text-white text-sm px-3 py-1.5 rounded-md transition">Generate</button>';
+                // No pipeline yet — show generate button
+                html += _pipelineHeader(false);
+                html += '<div class="text-center py-12">';
+                html += '<p class="text-gray-500 mb-4">No logic pipeline generated yet.</p>';
+                html += '<button id="gen-logic-btn" class="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg font-medium transition">';
+                html += 'Generate Pipeline';
+                html += '</button>';
                 html += '</div>';
             }
 
             detailContent.innerHTML = html;
-
-            var genBtn = document.getElementById("gen-logic-btn");
-            if (genBtn) {
-                genBtn.addEventListener("click", function () { generateLogic(name); });
-            }
+            _bindButtons(name);
         } catch (err) {
             detailContent.innerHTML = '<div class="text-red-400">Error: ' + err.message + '</div>';
         }
     }
 
-    // -- Generate LOGIC.md ----------------------------------------------
+    function _pipelineHeader(hasLogic) {
+        var h = '<div class="flex items-center justify-between mb-4">';
+        h += '<h2 class="text-lg font-bold">Logic Pipeline</h2>';
+        if (hasLogic) {
+            h += '<button id="refresh-logic-btn" class="flex items-center gap-1.5 text-sm text-gray-400 hover:text-blue-400 transition" title="Regenerate pipeline">';
+            h += '<svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">';
+            h += '<path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>';
+            h += '</svg>';
+            h += 'Refresh';
+            h += '</button>';
+        }
+        h += '</div>';
+        return h;
+    }
+
+    function _bindButtons(name) {
+        var genBtn = document.getElementById("gen-logic-btn");
+        if (genBtn) {
+            genBtn.addEventListener("click", function () { generateLogic(name); });
+        }
+        var refreshBtn = document.getElementById("refresh-logic-btn");
+        if (refreshBtn) {
+            refreshBtn.addEventListener("click", function () { generateLogic(name); });
+        }
+    }
+
+    // -- Generate / refresh logic pipeline ------------------------------
 
     async function generateLogic(name) {
-        var btn = document.getElementById("gen-logic-btn");
-        if (btn) { btn.disabled = true; btn.textContent = "Generating..."; }
+        // Replace content with generating state
+        detailContent.innerHTML =
+            '<div class="flex flex-col items-center justify-center py-16">' +
+            '<div class="typing-dots text-2xl text-blue-400 mb-4"><span>.</span><span>.</span><span>.</span></div>' +
+            '<p class="text-gray-400">Generating logic pipeline via agent...</p>' +
+            '</div>';
 
         try {
             var resp = await fetch("/api/skills/" + encodeURIComponent(name) + "/generate-logic", {
@@ -136,9 +177,23 @@
             });
             if (handleUnauthorized(resp)) return;
             if (!resp.ok) throw new Error("Generation failed");
+
+            // Update the has_logic badge in the card list
+            for (var i = 0; i < allSkills.length; i++) {
+                if (allSkills[i].name === name) { allSkills[i].has_logic = true; break; }
+            }
+
+            // Reload the detail to show fresh pipeline
             await loadDetail(name);
         } catch (err) {
-            if (btn) { btn.textContent = "Failed - Retry"; btn.disabled = false; }
+            detailContent.innerHTML =
+                '<div class="text-center py-12">' +
+                '<p class="text-red-400 mb-4">Pipeline generation failed: ' + err.message + '</p>' +
+                '<button id="gen-logic-btn" class="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg font-medium transition">' +
+                'Retry' +
+                '</button>' +
+                '</div>';
+            _bindButtons(name);
         }
     }
 
