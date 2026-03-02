@@ -28,29 +28,34 @@
         </button>
     </nav>
 
-    <div class="flex-1 flex overflow-hidden">
+    <div id="split-container" class="flex-1 flex overflow-hidden">
         <!-- Left: skill list -->
-        <div class="w-full md:w-1/2 lg:w-2/5 border-r border-gray-700 flex flex-col overflow-hidden">
-            <!-- Search -->
+        <div id="left-panel" class="flex flex-col overflow-hidden" style="width:35%;min-width:200px">
             <div class="p-4 border-b border-gray-700">
                 <input id="search" type="text" placeholder="Search skills..."
                     class="w-full bg-gray-700 text-gray-100 rounded-lg px-4 py-2 outline-none focus:ring-2 focus:ring-blue-500 placeholder-gray-400">
             </div>
-            <!-- Cards -->
             <div id="skills-grid" class="flex-1 overflow-y-auto p-4 space-y-3"></div>
         </div>
 
-        <!-- Right: skill detail -->
-        <div id="detail-panel" class="hidden md:flex flex-1 flex-col overflow-hidden">
+        <!-- Drag handle -->
+        <div id="drag-handle" class="split-handle"></div>
+
+        <!-- Right: skill detail (always visible) -->
+        <div id="right-panel" class="flex-1 flex flex-col overflow-hidden" style="min-width:300px">
             <div id="detail-header" class="p-6 border-b border-gray-700">
                 <h2 id="detail-name" class="text-2xl font-bold"></h2>
                 <p id="detail-desc" class="text-gray-400 mt-1"></p>
                 <div id="detail-badges" class="flex gap-2 mt-3"></div>
             </div>
-            <div id="detail-content" class="flex-1 overflow-y-auto p-6 prose prose-invert max-w-none"></div>
-        </div>
-        <div id="detail-empty" class="hidden md:flex flex-1 items-center justify-center text-gray-500">
-            Select a skill to view details
+            <div id="detail-content" class="flex-1 overflow-y-auto p-6 max-w-none">
+                <div class="flex items-center justify-center h-full text-gray-500">
+                    <div class="text-center">
+                        <i class="fa-solid fa-arrow-left text-3xl mb-3 block opacity-40"></i>
+                        Select a skill to view details
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 

@@ -1,4 +1,8 @@
-"""Build logic pipeline JSON from skill files — no LLM needed."""
+"""Build logic pipeline JSON from skill files — no LLM needed.
+
+Analyzes SKILL.md content, Python AST, and shell scripts to produce
+a structured pipeline with meaningful steps and decision branches.
+"""
 
 from __future__ import annotations
 
@@ -7,37 +11,22 @@ import json
 import re
 from pathlib import Path
 
-# Icon mapping: keyword in skill name/description → FA icon
+# Icon mapping: keyword → FA icon
 _ICON_MAP = [
-    ("cron", "fa-solid fa-clock"),
-    ("schedul", "fa-solid fa-clock"),
-    ("remind", "fa-solid fa-bell"),
-    ("github", "fa-solid fa-code-branch"),
-    ("git", "fa-solid fa-code-branch"),
-    ("weather", "fa-solid fa-cloud-sun"),
-    ("tmux", "fa-solid fa-terminal"),
-    ("shell", "fa-solid fa-terminal"),
-    ("exec", "fa-solid fa-terminal"),
-    ("memory", "fa-solid fa-brain"),
-    ("summar", "fa-solid fa-file-lines"),
-    ("skill", "fa-solid fa-puzzle-piece"),
-    ("web", "fa-solid fa-globe"),
-    ("fetch", "fa-solid fa-globe"),
-    ("search", "fa-solid fa-magnifying-glass"),
-    ("message", "fa-solid fa-message"),
-    ("chat", "fa-solid fa-comments"),
-    ("email", "fa-solid fa-envelope"),
-    ("file", "fa-solid fa-file"),
-    ("write", "fa-solid fa-pen"),
-    ("read", "fa-solid fa-book-open"),
-    ("python", "fa-solid fa-code"),
-    ("code", "fa-solid fa-code"),
-    ("improv", "fa-solid fa-wand-magic-sparkles"),
-    ("creat", "fa-solid fa-plus"),
-    ("updat", "fa-solid fa-rotate"),
+    ("cron", "fa-solid fa-clock"), ("schedul", "fa-solid fa-clock"),
+    ("remind", "fa-solid fa-bell"), ("github", "fa-solid fa-code-branch"),
+    ("git", "fa-solid fa-code-branch"), ("weather", "fa-solid fa-cloud-sun"),
+    ("tmux", "fa-solid fa-terminal"), ("shell", "fa-solid fa-terminal"),
+    ("exec", "fa-solid fa-terminal"), ("memory", "fa-solid fa-brain"),
+    ("summar", "fa-solid fa-file-lines"), ("skill", "fa-solid fa-puzzle-piece"),
+    ("web", "fa-solid fa-globe"), ("fetch", "fa-solid fa-globe"),
+    ("search", "fa-solid fa-magnifying-glass"), ("message", "fa-solid fa-message"),
+    ("chat", "fa-solid fa-comments"), ("email", "fa-solid fa-envelope"),
+    ("file", "fa-solid fa-file"), ("write", "fa-solid fa-pen"),
+    ("read", "fa-solid fa-book-open"), ("python", "fa-solid fa-code"),
+    ("code", "fa-solid fa-code"), ("improv", "fa-solid fa-wand-magic-sparkles"),
+    ("creat", "fa-solid fa-plus"), ("updat", "fa-solid fa-rotate"),
 ]
-
-_DEFAULT_ICON = "fa-solid fa-bolt"
 
 
 def build_pipeline(
@@ -50,94 +39,75 @@ def build_pipeline(
     meta = metadata or {}
     nanobot_meta = _parse_nanobot_meta(meta.get("metadata", ""))
     description = meta.get("description", skill_name)
-
-    # Detect entry point
     always_on = bool(nanobot_meta.get("always") or meta.get("always"))
-    trigger = _detect_trigger(skill_content, always_on)
-    icon = _pick_icon(skill_name, description)
+    body = _strip_frontmatter(skill_content)
 
-    # Collect scripts
+    icon = _pick_icon(skill_name, description)
+    trigger = _detect_trigger(body, description, always_on)
+
     py_files = list(skill_dir.rglob("*.py"))
     sh_files = list(skill_dir.rglob("*.sh"))
 
-    # Build steps
-    steps: list[dict] = []
-    deps: list[dict] = []
-    class_design = None
-
     if py_files:
-        # Analyze Python code via AST
-        steps, deps, class_design = _analyze_python(py_files, skill_content)
-    elif sh_files:
-        steps, deps = _analyze_shell(sh_files, skill_content)
+        steps, deps, class_design = _analyze_python(py_files, body)
     else:
-        # Markdown-only: parse sections and code blocks
-        steps, deps = _analyze_markdown(skill_content)
+        steps, deps = _analyze_content(body, sh_files)
+        class_design = None
 
-    # Extract dependencies from metadata requires
-    requires = nanobot_meta.get("requires", {})
-    for b in requires.get("bins", []):
+    # Merge deps from metadata requires
+    for b in nanobot_meta.get("requires", {}).get("bins", []):
         if not any(d["name"] == b for d in deps):
             deps.append({"name": b, "description": "Required CLI tool"})
-    for env in requires.get("env", []):
+    for env in nanobot_meta.get("requires", {}).get("env", []):
         if not any(d["name"] == env for d in deps):
             deps.append({"name": env, "description": "Required environment variable"})
 
-    # Ensure at least some steps
-    if not steps:
-        steps = _fallback_steps(skill_content, always_on)
+    # Ensure meaningful steps
+    if len(steps) < 2:
+        steps = _build_generic_steps(body, always_on, description)
 
-    pipeline = {
+    result: dict = {
         "entry_point": {"trigger": trigger, "icon": icon},
         "steps": steps,
         "dependencies": deps,
     }
     if class_design:
-        pipeline["class_design"] = class_design
-
-    return json.dumps(pipeline, indent=2)
+        result["class_design"] = class_design
+    return json.dumps(result, indent=2)
 
 
 # ------------------------------------------------------------------
-# Entry point detection
+# Trigger & icon detection
 # ------------------------------------------------------------------
 
-
-def _detect_trigger(content: str, always_on: bool) -> str:
-    lower = content.lower()
+def _detect_trigger(body: str, description: str, always_on: bool) -> str:
     if always_on:
-        return "Always-on skill, auto-injected into agent context"
-
-    # Check for tool references
-    tool_match = re.search(r'(?:use the |use )`(\w+)`\s+tool', lower)
+        return "Always-on: auto-injected into every agent conversation"
+    tool_match = re.search(r'[Uu]se (?:the )?`(\w+)`\s+tool', body)
     if tool_match:
-        return f"User triggers via the `{tool_match.group(1)}` tool call"
-
-    # Check for CLI commands
-    if "```bash" in lower or "```sh" in lower:
-        return "User requests a task that requires shell commands"
-
-    return "User message matching skill description"
+        return f"Activated when user needs the `{tool_match.group(1)}` tool"
+    if re.search(r'```bash', body):
+        return f"Triggered by user request: {description[:80]}"
+    return f"Triggered by user request: {description[:80]}"
 
 
 def _pick_icon(name: str, description: str) -> str:
     combined = (name + " " + description).lower()
-    for keyword, icon in _ICON_MAP:
-        if keyword in combined:
+    for kw, icon in _ICON_MAP:
+        if kw in combined:
             return icon
-    return _DEFAULT_ICON
+    return "fa-solid fa-bolt"
 
 
 # ------------------------------------------------------------------
-# Python analysis
+# Python AST analysis
 # ------------------------------------------------------------------
-
 
 def _analyze_python(
-    py_files: list[Path], skill_content: str
+    py_files: list[Path], body: str,
 ) -> tuple[list[dict], list[dict], dict | None]:
-    steps = []
-    deps = []
+    steps: list[dict] = []
+    deps: list[dict] = []
     class_design = None
 
     for f in py_files:
@@ -147,295 +117,315 @@ def _analyze_python(
         except Exception:
             continue
 
-        # Extract imports as dependencies
+        # Collect imports
         for node in ast.walk(tree):
             if isinstance(node, ast.Import):
                 for alias in node.names:
-                    mod = alias.name.split(".")[0]
-                    if mod not in {"os", "sys", "json", "re", "pathlib", "typing", "ast"}:
-                        if not any(d["name"] == mod for d in deps):
-                            deps.append({"name": mod, "description": f"Python library ({f.name})"})
+                    _add_dep(deps, alias.name.split(".")[0], f.name)
             elif isinstance(node, ast.ImportFrom) and node.module:
-                mod = node.module.split(".")[0]
-                if mod not in {"os", "sys", "json", "re", "pathlib", "typing", "ast", "nanobot"}:
-                    if not any(d["name"] == mod for d in deps):
-                        deps.append({"name": mod, "description": f"Python library ({f.name})"})
+                _add_dep(deps, node.module.split(".")[0], f.name)
 
-        # Extract classes
         classes = [n for n in ast.iter_child_nodes(tree) if isinstance(n, ast.ClassDef)]
-        if classes:
-            primary = classes[0]
-            init_method = None
-            public_methods = []
-            for item in primary.body:
-                if isinstance(item, ast.FunctionDef):
-                    if item.name == "__init__":
-                        init_method = item
-                    elif not item.name.startswith("_"):
-                        public_methods.append(item)
+        if not classes:
+            continue
 
-            # Build steps from class structure
+        cls = classes[0]
+        init = None
+        check_methods = []
+        action_methods = []
+
+        for item in cls.body:
+            if not isinstance(item, ast.FunctionDef):
+                continue
+            if item.name == "__init__":
+                init = item
+            elif item.name.startswith("_"):
+                continue
+            elif any(k in item.name.lower() for k in ("check", "valid", "verify", "can_", "is_", "has_")):
+                check_methods.append(item)
+            else:
+                action_methods.append(item)
+
+        # Step 1: Instantiation
+        if init:
+            params = [a.arg for a in init.args.args if a.arg != "self"]
+            desc = f"Initialize with: {', '.join(params[:4])}" if params else "Create instance"
+        else:
+            desc = "Create instance"
+        steps.append({"title": f"Create {cls.name}", "description": desc, "type": "action"})
+
+        # Step 2: Validation (decision branch)
+        for cm in check_methods[:1]:
+            doc = _docstring(cm) or f"Run {cm.name}() validation"
             steps.append({
-                "title": f"Instantiate {primary.name}",
-                "description": f"Create {primary.name} instance from {f.name}",
-                "type": "action",
+                "title": cm.name.replace("_", " ").title(),
+                "description": doc,
+                "type": "decision",
+                "branches": {
+                    "yes": {"label": "Passed", "steps": [
+                        {"title": "Continue execution", "description": "Proceed to main logic", "type": "action"},
+                    ]},
+                    "no": {"label": "Failed", "steps": [
+                        {"title": "Handle error", "description": "Return error or fallback", "type": "output"},
+                    ]},
+                },
             })
 
-            if init_method:
-                params = [a.arg for a in init_method.args.args if a.arg != "self"]
-                if params:
-                    steps.append({
-                        "title": "Configure parameters",
-                        "description": f"Set up: {', '.join(params[:5])}",
-                        "type": "action",
-                    })
+        # Step 3+: Public methods
+        for m in action_methods[:5]:
+            doc = _docstring(m) or m.name.replace("_", " ").capitalize()
+            steps.append({"title": f"{m.name}()", "description": doc, "type": "action"})
 
-            # Add decision if there's a method with "check" or "validate" in name
-            check_methods = [m for m in public_methods if any(
-                k in m.name.lower() for k in ("check", "valid", "verify", "can_", "is_", "has_")
-            )]
-            other_methods = [m for m in public_methods if m not in check_methods]
+        # Final: output
+        steps.append({"title": "Return result", "description": f"Output from {cls.name}", "type": "output"})
 
-            if check_methods:
-                cm = check_methods[0]
-                doc = _get_ast_docstring(cm) or f"Validate via {cm.name}()"
-                steps.append({
-                    "title": f"Check: {cm.name}()",
-                    "description": doc,
-                    "type": "decision",
-                    "branches": {
-                        "yes": {
-                            "label": "Validation passed",
-                            "steps": [{"title": "Proceed with execution",
-                                        "description": "Continue to main logic",
-                                        "type": "action"}],
-                        },
-                        "no": {
-                            "label": "Validation failed",
-                            "steps": [{"title": "Return error",
-                                        "description": "Report issue to user",
-                                        "type": "output"}],
-                        },
-                    },
-                })
-
-            for m in other_methods[:4]:
-                doc = _get_ast_docstring(m) or f"Execute {m.name}"
-                steps.append({
-                    "title": f"Call {m.name}()",
-                    "description": doc,
-                    "type": "action",
-                })
-
-            steps.append({
-                "title": "Return result",
-                "description": f"Output from {primary.name}",
-                "type": "output",
-            })
-
-            # Build class_design
-            class_design = {
-                "class_name": primary.name,
-                "methods": [
-                    {"name": m.name, "description": _get_ast_docstring(m) or ""}
-                    for m in public_methods[:8]
-                ],
-            }
-
-    # If no class found, just show file-level steps
-    if not steps:
-        for f in py_files:
-            steps.append({
-                "title": f"Execute {f.name}",
-                "description": f"Run Python script {f.name}",
-                "type": "action",
-            })
-        steps.append({"title": "Return result", "description": "Script output", "type": "output"})
+        class_design = {
+            "class_name": cls.name,
+            "methods": [
+                {"name": m.name, "description": _docstring(m) or m.name.replace("_", " ")}
+                for m in (check_methods + action_methods)[:8]
+            ],
+        }
+        break  # Process first class only
 
     return steps, deps, class_design
 
 
-def _get_ast_docstring(node: ast.AST) -> str:
-    if (
-        node.body
-        and isinstance(node.body[0], ast.Expr)
-        and isinstance(node.body[0].value, ast.Constant)
-        and isinstance(node.body[0].value.value, str)
-    ):
-        doc = node.body[0].value.value.strip()
-        # Truncate long docstrings
-        return doc[:100] if len(doc) > 100 else doc
+_STDLIB = {
+    "os", "sys", "json", "re", "pathlib", "typing", "ast", "abc",
+    "collections", "functools", "itertools", "dataclasses", "enum",
+    "datetime", "time", "math", "hashlib", "secrets", "uuid",
+    "shutil", "subprocess", "asyncio", "logging", "copy", "io",
+    "contextlib", "unittest", "tempfile", "textwrap", "nanobot",
+}
+
+
+def _add_dep(deps: list[dict], mod: str, filename: str):
+    if mod in _STDLIB or not mod:
+        return
+    if not any(d["name"] == mod for d in deps):
+        deps.append({"name": mod, "description": f"Python library (from {filename})"})
+
+
+def _docstring(node: ast.AST) -> str:
+    if (node.body and isinstance(node.body[0], ast.Expr)
+            and isinstance(node.body[0].value, ast.Constant)
+            and isinstance(node.body[0].value.value, str)):
+        return node.body[0].value.value.strip()[:100]
     return ""
 
 
 # ------------------------------------------------------------------
-# Shell script analysis
+# Content-based analysis (markdown + optional shell scripts)
 # ------------------------------------------------------------------
 
-
-def _analyze_shell(
-    sh_files: list[Path], skill_content: str
+def _analyze_content(
+    body: str, sh_files: list[Path],
 ) -> tuple[list[dict], list[dict]]:
-    steps = []
-    deps = []
+    steps: list[dict] = []
+    deps: list[dict] = []
 
+    # 1) Extract tool call patterns: tool_name(action="xxx", ...)
+    tool_actions: dict[str, list[dict]] = {}  # tool → [{action, full_call}]
+    for match in re.finditer(r'(\w+)\(([^)]+)\)', body):
+        name, args = match.group(1), match.group(2)
+        if name[0].isupper() or len(name) < 2:
+            continue
+        action_m = re.search(r'action\s*=\s*["\'](\w+)', args)
+        action = action_m.group(1) if action_m else None
+        tool_actions.setdefault(name, []).append({
+            "action": action,
+            "call": f'{name}({args[:60]}{"..." if len(args) > 60 else ""})',
+        })
+
+    # 2) Build steps from tool calls
+    for tool_name, calls in tool_actions.items():
+        actions = {}
+        for c in calls:
+            key = c["action"] or "default"
+            if key not in actions:
+                actions[key] = c["call"]
+
+        if len(actions) == 1:
+            # Single action tool
+            key = list(actions.keys())[0]
+            steps.append({
+                "title": f"Call {tool_name}",
+                "description": actions[key],
+                "type": "action",
+            })
+        else:
+            # Multi-action tool → decision branch
+            steps.append({
+                "title": f"Receive {tool_name} request",
+                "description": f"Parse user intent for {tool_name} operation",
+                "type": "action",
+            })
+            branches = {}
+            for act, call_str in list(actions.items())[:4]:
+                branches[act] = {
+                    "label": f"action = {act}",
+                    "steps": [{"title": act.replace("_", " ").title(),
+                               "description": call_str, "type": "action"}],
+                }
+            steps.append({
+                "title": f"Route {tool_name} action",
+                "description": f"Choose from: {', '.join(actions.keys())}",
+                "type": "decision",
+                "branches": branches,
+            })
+
+    # 3) Extract bash commands and deps
+    bash_cmds: list[str] = []
+    for block in re.findall(r'```(?:bash|sh)?\n(.*?)```', body, re.DOTALL):
+        for line in block.strip().split("\n"):
+            line = line.strip()
+            if not line or line.startswith("#") or line.startswith("$"):
+                continue
+            cmd = line.split()[0] if line.split() else ""
+            if cmd in {"curl", "wget", "jq", "gh", "git", "tmux", "npm", "node",
+                        "python3", "docker", "kubectl", "aws", "gcloud"}:
+                if cmd not in bash_cmds:
+                    bash_cmds.append(cmd)
+                    deps.append({"name": cmd, "description": "CLI tool used in skill"})
+
+    # 4) Shell script analysis
     for f in sh_files:
         try:
             source = f.read_text(encoding="utf-8")
         except Exception:
             continue
-
-        steps.append({
-            "title": f"Run {f.name}",
-            "description": _extract_shell_purpose(source, f.name),
-            "type": "action",
-        })
-
-        # Extract commands used
+        purpose = _shell_purpose(source, f.name)
+        steps.append({"title": f"Run {f.name}", "description": purpose, "type": "action"})
         for line in source.split("\n"):
-            line = line.strip()
-            if not line or line.startswith("#"):
-                continue
-            cmd = line.split()[0] if line.split() else ""
-            if cmd in {"curl", "wget", "jq", "grep", "awk", "sed", "tmux", "gh", "git", "npm", "node", "python3", "python"}:
+            cmd = line.strip().split()[0] if line.strip().split() else ""
+            if cmd in {"curl", "wget", "jq", "gh", "git", "tmux", "grep", "awk", "sed"}:
                 if not any(d["name"] == cmd for d in deps):
                     deps.append({"name": cmd, "description": f"Used in {f.name}"})
 
-    # Add markdown-derived steps too
-    md_steps, md_deps = _analyze_markdown(skill_content)
-    # Only add markdown steps if shell didn't produce enough
-    if len(steps) < 3:
-        steps.extend(md_steps)
-    deps.extend(d for d in md_deps if not any(x["name"] == d["name"] for x in deps))
+    # 5) If no tool calls found, extract workflow from section structure
+    if not steps:
+        steps = _extract_workflow_from_sections(body)
 
-    if steps and steps[-1]["type"] != "output":
-        steps.append({"title": "Return output", "description": "Script results", "type": "output"})
+    # 6) Ensure output step
+    if steps and steps[-1].get("type") != "output":
+        steps.append({"title": "Return result", "description": "Send response to user", "type": "output"})
 
     return steps, deps
 
 
-def _extract_shell_purpose(source: str, filename: str) -> str:
-    """Extract purpose from first comment block."""
+def _shell_purpose(source: str, filename: str) -> str:
     for line in source.split("\n"):
         line = line.strip()
         if line.startswith("#!"):
             continue
         if line.startswith("#"):
             comment = line.lstrip("# ").strip()
-            if comment and len(comment) > 5:
+            if len(comment) > 5:
                 return comment[:80]
     return f"Execute {filename}"
 
 
-# ------------------------------------------------------------------
-# Markdown-only analysis
-# ------------------------------------------------------------------
-
-
-def _analyze_markdown(skill_content: str) -> tuple[list[dict], list[dict]]:
+def _extract_workflow_from_sections(body: str) -> list[dict]:
+    """Extract meaningful steps from markdown sections."""
     steps = []
-    deps = []
-    body = _strip_frontmatter(skill_content)
+    sections = re.split(r'^##\s+(.+)$', body, flags=re.MULTILINE)
 
-    # Extract sections (## headings)
-    sections = re.split(r'^##\s+', body, flags=re.MULTILINE)
+    # sections = [pre, title1, body1, title2, body2, ...]
+    i = 1
+    while i < len(sections) - 1:
+        title = sections[i].strip()
+        sec_body = sections[i + 1]
+        i += 2
 
-    # Extract tool calls from code blocks
-    tool_calls = re.findall(r'(\w+)\(([^)]*)\)', body)
-    seen_tools = set()
-    for name, args in tool_calls:
-        if name not in seen_tools and name[0].islower() and len(name) > 2:
-            seen_tools.add(name)
-            # Extract action param if present
-            action_match = re.search(r'action\s*=\s*["\'](\w+)', args)
-            desc = f'{name}(action="{action_match.group(1)}")' if action_match else f'{name}({args[:40]})'
-            steps.append({
-                "title": f"Call {name} tool",
-                "description": desc,
-                "type": "action",
-            })
+        # Skip generic sections
+        if title.lower() in {"about", "overview", "introduction", "notes"}:
+            continue
 
-    # Extract bash commands from code blocks
-    bash_blocks = re.findall(r'```(?:bash|sh)?\n(.*?)```', body, re.DOTALL)
-    seen_cmds = set()
-    for block in bash_blocks:
-        for line in block.strip().split("\n"):
-            line = line.strip()
-            if not line or line.startswith("#"):
-                continue
-            cmd = line.split()[0] if line.split() else ""
-            if cmd and cmd not in seen_cmds and not cmd.startswith("$") and not cmd.startswith("{"):
-                seen_cmds.add(cmd)
-                if cmd in {"curl", "wget", "gh", "git", "tmux", "npm", "node", "python3", "docker"}:
-                    if not any(d["name"] == cmd for d in deps):
-                        deps.append({"name": cmd, "description": "CLI tool used in examples"})
+        # Extract first meaningful sentence from section body
+        desc = _first_sentence(sec_body)
 
-    # If we found tool calls, add decision step for multi-action tools
-    if len(seen_tools) == 1 and len(tool_calls) > 2:
-        tool_name = list(seen_tools)[0]
-        actions = set()
-        for name, args in tool_calls:
-            if name == tool_name:
-                m = re.search(r'action\s*=\s*["\'](\w+)', args)
-                if m:
-                    actions.add(m.group(1))
-        if len(actions) >= 2:
-            action_list = sorted(actions)
+        # Check if section describes multiple options (numbered list or sub-headings)
+        options = re.findall(r'^\d+\.\s+\*\*(.+?)\*\*\s*[-–—]\s*(.+)', sec_body, re.MULTILINE)
+        if len(options) >= 2:
             branches = {}
-            for a in action_list[:2]:
-                branches[a] = {
-                    "label": f"action={a}",
-                    "steps": [{"title": f"Execute {a}", "description": f"{tool_name}(action=\"{a}\")", "type": "action"}],
+            for opt_title, opt_desc in options[:3]:
+                key = opt_title.strip().lower().replace(" ", "_")[:20]
+                branches[key] = {
+                    "label": opt_title.strip(),
+                    "steps": [{"title": opt_title.strip()[:40],
+                               "description": opt_desc.strip()[:80], "type": "action"}],
                 }
-            # Insert decision before the tool-call steps
-            decision = {
-                "title": f"Select {tool_name} action",
-                "description": "User specifies which action to perform",
+            steps.append({
+                "title": title[:50],
+                "description": desc,
                 "type": "decision",
                 "branches": branches,
-            }
-            steps = [steps[0]] + [decision] + steps[1:] if steps else [decision]
+            })
+        else:
+            steps.append({"title": title[:50], "description": desc, "type": "action"})
 
-    # Parse section headings as additional context
-    if not steps and len(sections) > 1:
-        for sec in sections[1:6]:
-            title = sec.split("\n")[0].strip()
-            if title:
-                steps.append({
-                    "title": title[:50],
-                    "description": f"Section: {title}",
-                    "type": "action",
-                })
+        if len(steps) >= 7:
+            break
 
-    return steps, deps
+    return steps
+
+
+def _first_sentence(text: str) -> str:
+    """Extract first meaningful sentence from markdown text."""
+    for line in text.strip().split("\n"):
+        line = line.strip()
+        if not line or line.startswith("#") or line.startswith("```") or line.startswith("|") or line.startswith("-"):
+            continue
+        # Clean markdown formatting
+        clean = re.sub(r'[`*_\[\]]', '', line).strip()
+        if len(clean) > 10:
+            return clean[:100]
+    return ""
 
 
 # ------------------------------------------------------------------
-# Fallback
+# Generic fallback steps
 # ------------------------------------------------------------------
 
-
-def _fallback_steps(content: str, always_on: bool) -> list[dict]:
+def _build_generic_steps(body: str, always_on: bool, description: str) -> list[dict]:
     steps = []
     if always_on:
         steps.append({
-            "title": "Inject into context",
-            "description": "Skill content loaded into agent system prompt",
+            "title": "Inject skill context",
+            "description": "Skill instructions loaded into agent system prompt automatically",
             "type": "action",
         })
     steps.append({
         "title": "Receive user request",
-        "description": "Agent receives message matching skill triggers",
+        "description": f"User asks: {description[:60]}",
         "type": "action",
     })
-    steps.append({
-        "title": "Process request",
-        "description": "Agent follows skill instructions to handle the task",
-        "type": "action",
-    })
+    # Check if body mentions conditions/modes
+    mode_match = re.findall(r'\d+\.\s+\*\*(.+?)\*\*', body)
+    if len(mode_match) >= 2:
+        branches = {}
+        for m in mode_match[:3]:
+            key = m.strip().lower().replace(" ", "_")[:20]
+            branches[key] = {
+                "label": m.strip(),
+                "steps": [{"title": m.strip()[:40], "description": f"Execute {m.strip().lower()} workflow", "type": "action"}],
+            }
+        steps.append({
+            "title": "Select mode",
+            "description": f"Choose from: {', '.join(m.strip() for m in mode_match[:3])}",
+            "type": "decision",
+            "branches": branches,
+        })
+    else:
+        steps.append({
+            "title": "Process request",
+            "description": "Follow skill instructions to execute the task",
+            "type": "action",
+        })
     steps.append({
         "title": "Return response",
-        "description": "Agent sends result back to user",
+        "description": "Send result back to user",
         "type": "output",
     })
     return steps
@@ -445,12 +435,11 @@ def _fallback_steps(content: str, always_on: bool) -> list[dict]:
 # Helpers
 # ------------------------------------------------------------------
 
-
 def _strip_frontmatter(content: str) -> str:
     if content.startswith("---"):
-        match = re.match(r"^---\n.*?\n---\n", content, re.DOTALL)
-        if match:
-            return content[match.end():]
+        m = re.match(r"^---\n.*?\n---\n", content, re.DOTALL)
+        if m:
+            return content[m.end():]
     return content
 
 

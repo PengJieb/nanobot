@@ -1,12 +1,10 @@
-/* nanobot skills dashboard — card-based logic pipeline with decision branches */
+/* nanobot skills dashboard — two-column resizable layout */
 (function () {
     var token = localStorage.getItem("nanobot_token");
     if (!token) { window.location.href = "/login.html"; return; }
 
     var grid = document.getElementById("skills-grid");
     var searchInput = document.getElementById("search");
-    var detailPanel = document.getElementById("detail-panel");
-    var detailEmpty = document.getElementById("detail-empty");
     var detailName = document.getElementById("detail-name");
     var detailDesc = document.getElementById("detail-desc");
     var detailBadges = document.getElementById("detail-badges");
@@ -16,7 +14,39 @@
     var allSkills = [];
     var activeCard = null;
 
-    /* Badge styles using inline rgba — avoids Tailwind JIT issues with /40 */
+    /* ---- Drag-to-resize ---- */
+    (function initSplitter() {
+        var handle = document.getElementById("drag-handle");
+        var left = document.getElementById("left-panel");
+        var container = document.getElementById("split-container");
+        var dragging = false;
+
+        handle.addEventListener("mousedown", function (e) {
+            e.preventDefault();
+            dragging = true;
+            handle.classList.add("dragging");
+            document.body.classList.add("col-resizing");
+        });
+
+        document.addEventListener("mousemove", function (e) {
+            if (!dragging) return;
+            var rect = container.getBoundingClientRect();
+            var x = e.clientX - rect.left;
+            var pct = (x / rect.width) * 100;
+            if (pct < 15) pct = 15;
+            if (pct > 70) pct = 70;
+            left.style.width = pct + "%";
+        });
+
+        document.addEventListener("mouseup", function () {
+            if (!dragging) return;
+            dragging = false;
+            handle.classList.remove("dragging");
+            document.body.classList.remove("col-resizing");
+        });
+    })();
+
+    /* ---- Badge styles ---- */
     var B = {
         builtin:  "background:rgba(139,92,246,0.18);color:#c4b5fd",
         workspace:"background:rgba(34,197,94,0.18);color:#86efac",
@@ -28,7 +58,6 @@
         decision: "background:rgba(245,158,11,0.18);color:#fcd34d",
         output:   "background:rgba(16,185,129,0.18);color:#6ee7b7"
     };
-
     var STEP_ICONS = { action: "fa-solid fa-gear", decision: "fa-solid fa-code-branch", output: "fa-solid fa-flag-checkered" };
 
     function authHeaders(extra) {
@@ -81,9 +110,6 @@
 
     /* ---- Load skill detail ---- */
     async function loadDetail(name) {
-        detailPanel.classList.remove("hidden");
-        detailPanel.classList.add("flex");
-        detailEmpty.classList.add("hidden");
         detailContent.innerHTML = '<div class="text-gray-500 p-8">Loading...</div>';
         try {
             var resp = await fetch("/api/skills/" + encodeURIComponent(name), { headers: authHeaders() });
@@ -116,7 +142,7 @@
         }
     }
 
-    /* ---- Render pipeline with decision branches ---- */
+    /* ---- Render pipeline ---- */
     function renderPipeline(p) {
         var h = "";
         var icon = (p.entry_point.icon || "fa-solid fa-bolt").replace(/"/g, "");
@@ -160,20 +186,17 @@
         return h;
     }
 
-    /** Render steps recursively — handles decision branches */
     function renderSteps(steps, depth) {
         var ml = depth > 0 ? "margin-left:1.5rem;" : "margin-left:1rem;";
         var dotColor = depth === 0 ? "#14b8a6" : (depth === 1 ? "#f59e0b" : "#f43f5e");
         var lineColor = depth === 0 ? "rgba(20,184,166,0.3)" : "rgba(245,158,11,0.3)";
         var h = '<div class="relative" style="' + ml + '">';
         h += '<div class="absolute top-0 bottom-0 w-0.5" style="left:13px;background:' + lineColor + '"></div>';
-
         for (var i = 0; i < steps.length; i++) {
             var s = steps[i];
-            var num = i + 1;
             var stepIcon = STEP_ICONS[s.type] || STEP_ICONS.action;
             h += '<div class="flex items-start mb-4 relative">';
-            h += '<div class="flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold z-10" style="background:' + dotColor + '">' + num + '</div>';
+            h += '<div class="flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold z-10" style="background:' + dotColor + '">' + (i + 1) + '</div>';
             h += '<div class="ml-4 flex-1">';
             h += '<div class="flex items-center gap-2 flex-wrap">';
             h += '<i class="' + stepIcon + ' text-sm" style="color:' + dotColor + '"></i>';
@@ -182,28 +205,20 @@
             if (s.type === "output") h += stBadge("output", B.output);
             h += '</div>';
             h += '<p class="text-sm text-gray-400 mt-0.5">' + esc(s.description || "") + '</p>';
-
-            /* Decision branches */
             if (s.type === "decision" && s.branches) {
                 h += '<div class="mt-3 space-y-3">';
-                var branchKeys = Object.keys(s.branches);
-                for (var b = 0; b < branchKeys.length; b++) {
-                    var bk = branchKeys[b];
-                    var branch = s.branches[bk];
+                var bks = Object.keys(s.branches);
+                for (var b = 0; b < bks.length; b++) {
+                    var bk = bks[b], br = s.branches[bk];
                     var bColor = bk === "yes" ? "#14b8a6" : "#f43f5e";
                     var bBg = bk === "yes" ? "rgba(20,184,166,0.08)" : "rgba(244,63,94,0.08)";
                     var bBorder = bk === "yes" ? "rgba(20,184,166,0.2)" : "rgba(244,63,94,0.2)";
                     var bIcon = bk === "yes" ? "fa-solid fa-check" : "fa-solid fa-xmark";
-
                     h += '<div style="background:' + bBg + ';border:1px solid ' + bBorder + ';border-radius:0.75rem;padding:0.75rem 1rem">';
-                    h += '<div class="flex items-center gap-2 mb-2">';
-                    h += '<i class="' + bIcon + '" style="color:' + bColor + '"></i>';
+                    h += '<div class="flex items-center gap-2 mb-2"><i class="' + bIcon + '" style="color:' + bColor + '"></i>';
                     h += '<span class="font-semibold text-sm" style="color:' + bColor + '">' + esc(bk.toUpperCase()) + '</span>';
-                    h += '<span class="text-xs text-gray-400">' + esc(branch.label || "") + '</span>';
-                    h += '</div>';
-                    if (branch.steps && branch.steps.length) {
-                        h += renderSteps(branch.steps, depth + 1);
-                    }
+                    h += '<span class="text-xs text-gray-400">' + esc(br.label || "") + '</span></div>';
+                    if (br.steps && br.steps.length) h += renderSteps(br.steps, depth + 1);
                     h += '</div>';
                 }
                 h += '</div>';
@@ -215,15 +230,13 @@
     }
 
     /* ---- Card helper ---- */
-    var CARD_COLORS = {
+    var CC = {
         blue:   { bg: "rgba(59,130,246,0.08)",  border: "rgba(59,130,246,0.2)",  icon: "#3b82f6" },
-        teal:   { bg: "rgba(20,184,166,0.08)",   border: "rgba(20,184,166,0.2)",  icon: "#14b8a6" },
         purple: { bg: "rgba(139,92,246,0.08)",    border: "rgba(139,92,246,0.2)",  icon: "#8b5cf6" },
         amber:  { bg: "rgba(245,158,11,0.08)",    border: "rgba(245,158,11,0.2)",  icon: "#f59e0b" }
     };
-
     function card(color, icon, title, body) {
-        var c = CARD_COLORS[color] || CARD_COLORS.blue;
+        var c = CC[color] || CC.blue;
         return '<div class="pipe-card" style="background:' + c.bg + ';border:1px solid ' + c.border + ';border-radius:1rem;padding:1.5rem;margin-bottom:1rem">'
             + '<div class="flex items-center mb-3"><i class="' + icon + ' text-xl mr-3" style="color:' + c.icon + '"></i>'
             + '<h3 class="text-lg font-bold text-gray-100">' + title + '</h3></div>' + body + '</div>';

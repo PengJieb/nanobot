@@ -127,6 +127,35 @@
     border-color: #3b82f6;
 }
 
+/* Split panel drag handle */
+.split-handle {
+    width: 5px;
+    cursor: col-resize;
+    background: #374151;
+    flex-shrink: 0;
+    transition: background 0.15s;
+    position: relative;
+}
+.split-handle:hover,
+.split-handle.dragging {
+    background: #3b82f6;
+}
+.split-handle::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 3px;
+    height: 32px;
+    border-left: 1px solid rgba(255,255,255,0.15);
+    border-right: 1px solid rgba(255,255,255,0.15);
+}
+body.col-resizing {
+    cursor: col-resize;
+    user-select: none;
+}
+
 /* Pipeline card hover */
 .pipe-card {
     transition: all 0.2s ease;
