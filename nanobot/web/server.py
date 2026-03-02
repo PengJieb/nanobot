@@ -13,7 +13,8 @@ from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
 from nanobot.web.auth import AuthManager
-from nanobot.web.pipeline import build_pipeline
+from nanobot.web.pipeline import build_prompt, parse_logic_json
+from nanobot.web.renderer import render_pipeline_html
 
 if TYPE_CHECKING:
     from nanobot.agent.loop import AgentLoop
@@ -45,7 +46,7 @@ def create_app(
         return await call_next(request)
 
     # ------------------------------------------------------------------
-    # Auth endpoints
+    # Auth
     # ------------------------------------------------------------------
 
     @app.post("/api/auth/register")
@@ -78,7 +79,7 @@ def create_app(
         return {"token": token, "username": username}
 
     # ------------------------------------------------------------------
-    # Chat endpoints
+    # Chat
     # ------------------------------------------------------------------
 
     @app.post("/api/chat/new")
@@ -125,7 +126,7 @@ def create_app(
         return StreamingResponse(event_stream(), media_type="text/event-stream")
 
     # ------------------------------------------------------------------
-    # Skills endpoints
+    # Skills
     # ------------------------------------------------------------------
 
     @app.get("/api/skills")
@@ -138,7 +139,7 @@ def create_app(
             available = skills_loader._check_requirements(skill_meta)
             always_on = bool(skill_meta.get("always") or meta.get("always"))
             skill_dir = Path(s["path"]).parent
-            has_logic = (skill_dir / "LOGIC.md").exists()
+            has_logic = (skill_dir / "LOGIC.json").exists()
             result.append({
                 "name": s["name"], "source": s["source"],
                 "description": meta.get("description", s["name"]),
@@ -156,20 +157,29 @@ def create_app(
         available = skills_loader._check_requirements(skill_meta)
         always_on = bool(skill_meta.get("always") or meta.get("always"))
         skill_dir = _find_skill_dir(skills_loader, name)
-        logic_content = None
-        if skill_dir and (skill_dir / "LOGIC.md").exists():
-            logic_content = (skill_dir / "LOGIC.md").read_text(encoding="utf-8")
         has_python = bool(skill_dir and list(skill_dir.rglob("*.py")))
+
+        # Read cached LOGIC.json → render HTML via Python
+        logic_html = None
+        logic_json_path = skill_dir / "LOGIC.json" if skill_dir else None
+        if logic_json_path and logic_json_path.exists():
+            try:
+                data = _json.loads(logic_json_path.read_text(encoding="utf-8"))
+                logic_html = render_pipeline_html(data)
+            except Exception:
+                logic_html = None
+
         return {
             "name": name, "description": meta.get("description", name),
             "source": _get_skill_source(skills_loader, name),
             "available": available, "always_on": always_on,
-            "content": content, "logic": logic_content, "has_python": has_python,
+            "content": content, "logic_html": logic_html,
+            "has_logic": logic_html is not None, "has_python": has_python,
         }
 
     @app.post("/api/skills/{name}/generate-logic")
     async def generate_logic(name: str):
-        """Generate pipeline using Python analysis (no LLM call)."""
+        """Use LLM to extract structured JSON, then render via Python."""
         skill_dir = _find_skill_dir(skills_loader, name)
         if skill_dir is None:
             raise HTTPException(status_code=404, detail="skill not found")
@@ -177,12 +187,23 @@ def create_app(
         if not skill_content:
             raise HTTPException(status_code=404, detail="skill not found")
 
-        meta = skills_loader.get_skill_metadata(name) or {}
-        result = build_pipeline(name, skill_content, meta, skill_dir)
+        # Phase 1: LLM extracts structured JSON
+        prompt = build_prompt(name, skill_content, skill_dir)
+        raw = await agent.process_direct(
+            prompt, session_key=f"web:logic:{name}", channel="web", chat_id="system",
+        )
 
-        logic_path = skill_dir / "LOGIC.md"
-        logic_path.write_text(result, encoding="utf-8")
-        return {"logic": result}
+        data = parse_logic_json(raw)
+        if data is None:
+            raise HTTPException(status_code=500, detail="Failed to parse pipeline JSON from agent")
+
+        # Cache the JSON
+        json_path = skill_dir / "LOGIC.json"
+        json_path.write_text(_json.dumps(data, indent=2), encoding="utf-8")
+
+        # Phase 2: Python renders HTML from JSON
+        html = render_pipeline_html(data)
+        return {"logic_html": html}
 
     # ------------------------------------------------------------------
     # Static files
