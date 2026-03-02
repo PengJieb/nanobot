@@ -25,90 +25,74 @@ _PUBLIC_PATHS = {"/api/auth/login", "/api/auth/register"}
 _PUBLIC_PREFIXES = ("/login.html", "/style.css")
 
 # Prompt for skills WITH existing Python code
-_LOGIC_PROMPT_WITH_CODE = """\
-Analyze the following nanobot skill and generate a logic pipeline as a Mermaid flowchart.
+_LOGIC_PROMPT_WITH_CODE = (
+    "Analyze the following nanobot skill and its code. Output a JSON object "
+    "describing the logic pipeline. Respond with ONLY valid JSON — no markdown "
+    "fences, no extra text.\n\n"
+    "## SKILL.md\n```\n{skill_content}\n```\n\n"
+    "## Python / Shell Scripts\n{scripts_section}\n\n"
+    'Output this exact JSON structure:\n'
+    '{{\n'
+    '  "entry_point": {{\n'
+    '    "trigger": "how the skill is triggered (one sentence)",\n'
+    '    "icon": "fa-solid fa-<icon-name>"\n'
+    '  }},\n'
+    '  "steps": [\n'
+    '    {{\n'
+    '      "title": "short step title (3-6 words)",\n'
+    '      "description": "what happens in this step (one sentence)",\n'
+    '      "type": "action"\n'
+    '    }}\n'
+    '  ],\n'
+    '  "dependencies": [\n'
+    '    {{"name": "tool or library", "description": "what it is used for"}}\n'
+    '  ]\n'
+    '}}\n\n'
+    "Rules:\n"
+    "- steps: 4-8 items covering the real execution flow\n"
+    '- step type: "action", "decision", or "output"\n'
+    "- icon: a Font Awesome 6 solid icon name relevant to the entry point\n"
+    "- dependencies: list all external tools, libraries, CLI binaries, APIs, env vars\n"
+    "- Keep all text concise"
+)
 
-## SKILL.md
-```
-{skill_content}
-```
-
-## Python / Shell Scripts
-{scripts_section}
-
-Generate a LOGIC.md with this EXACT structure:
-
-## Entry Point
-One line: how the skill is triggered.
-
-## Pipeline
-```mermaid
-flowchart TD
-    A["Step 1: trigger description"] --> B["Step 2: action"]
-    B --> C{{Decision point}}
-    C -->|yes| D["Step 3a: action"]
-    C -->|no| E["Step 3b: fallback"]
-    D --> F["Step 4: output"]
-    E --> F
-```
-
-## Dependencies
-Bullet list of external tools, libraries, APIs, or env vars required.
-
-Rules for the mermaid flowchart:
-- Use flowchart TD (top-down)
-- Use rectangle nodes ["..."] for actions, rounded ("...") for start/end, diamond {{"..."}} for decisions
-- Keep node labels short (under 8 words)
-- Include 4-10 nodes that cover the real execution flow
-- Use descriptive edge labels where needed
-
-Write ONLY the LOGIC.md content. Do not add outer code fences.\
-"""
-
-# Prompt for skills WITHOUT Python code — instruct py-writer style reconstruction
-_LOGIC_PROMPT_NO_CODE = """\
-Analyze the following nanobot skill and generate a logic pipeline as a Mermaid flowchart.
-
-This skill has NO Python implementation — it is a markdown-only skill. \
-Describe its execution logic as if it were implemented following the \
-py-writer class-centric pattern (one primary class with public methods).
-
-## SKILL.md
-```
-{skill_content}
-```
-
-Generate a LOGIC.md with this EXACT structure:
-
-## Entry Point
-One line: how the skill is triggered (user message, always-on injection, or tool call).
-
-## Pipeline
-```mermaid
-flowchart TD
-    A["Step 1: trigger description"] --> B["Step 2: action"]
-    B --> C{{Decision point}}
-    C -->|yes| D["Step 3a: action"]
-    C -->|no| E["Step 3b: fallback"]
-    D --> F["Step 4: output"]
-    E --> F
-```
-
-## Dependencies
-Bullet list of external tools, CLI binaries, APIs, or env vars required.
-
-## Reconstructed Class
-Primary class name, constructor params, and key public methods (bullet list).
-
-Rules for the mermaid flowchart:
-- Use flowchart TD (top-down)
-- Use rectangle nodes ["..."] for actions, rounded ("...") for start/end, diamond {{"..."}} for decisions
-- Keep node labels short (under 8 words)
-- Include 4-10 nodes that cover the real execution flow
-- Use descriptive edge labels where needed
-
-Write ONLY the LOGIC.md content. Do not add outer code fences.\
-"""
+# Prompt for skills WITHOUT Python code
+_LOGIC_PROMPT_NO_CODE = (
+    "Analyze the following nanobot skill. It has NO Python implementation — "
+    "it is a markdown-only skill. Describe its execution logic. Output a JSON "
+    "object. Respond with ONLY valid JSON — no markdown fences, no extra text.\n\n"
+    "## SKILL.md\n```\n{skill_content}\n```\n\n"
+    'Output this exact JSON structure:\n'
+    '{{\n'
+    '  "entry_point": {{\n'
+    '    "trigger": "how the skill is triggered (one sentence)",\n'
+    '    "icon": "fa-solid fa-<icon-name>"\n'
+    '  }},\n'
+    '  "steps": [\n'
+    '    {{\n'
+    '      "title": "short step title (3-6 words)",\n'
+    '      "description": "what happens in this step (one sentence)",\n'
+    '      "type": "action"\n'
+    '    }}\n'
+    '  ],\n'
+    '  "dependencies": [\n'
+    '    {{"name": "tool or library", "description": "what it is used for"}}\n'
+    '  ],\n'
+    '  "class_design": {{\n'
+    '    "class_name": "HypotheticalClassName",\n'
+    '    "methods": [\n'
+    '      {{"name": "method_name", "description": "what it does"}}\n'
+    '    ]\n'
+    '  }}\n'
+    '}}\n\n'
+    "Rules:\n"
+    "- steps: 4-8 items covering the real execution flow\n"
+    '- step type: "action", "decision", or "output"\n'
+    "- icon: a Font Awesome 6 solid icon name relevant to the entry point\n"
+    "- dependencies: list all external tools, libraries, CLI binaries, APIs, env vars\n"
+    "- class_design: reconstruct how this skill WOULD be implemented as a Python class\n"
+    "- Keep all text concise"
+)
 
 
 def create_app(
@@ -292,7 +276,6 @@ def create_app(
         if not skill_content:
             raise HTTPException(status_code=404, detail="skill not found")
 
-        # Collect scripts in the skill directory
         scripts: list[str] = []
         for ext in ("*.py", "*.sh"):
             for f in skill_dir.rglob(ext):
