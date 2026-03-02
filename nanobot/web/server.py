@@ -13,6 +13,7 @@ from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
 from nanobot.web.auth import AuthManager
+from nanobot.web.pipeline import build_pipeline
 
 if TYPE_CHECKING:
     from nanobot.agent.loop import AgentLoop
@@ -22,80 +23,6 @@ STATIC_DIR = Path(__file__).parent / "static"
 
 _PUBLIC_PATHS = {"/api/auth/login", "/api/auth/register"}
 _PUBLIC_PREFIXES = ("/login.html", "/style.css")
-
-_STEP_SCHEMA = (
-    '    {{\n'
-    '      "title": "short title (3-6 words)",\n'
-    '      "description": "one sentence",\n'
-    '      "type": "action"\n'
-    '    }}\n'
-)
-
-_DECISION_SCHEMA = (
-    '    {{\n'
-    '      "title": "condition to evaluate",\n'
-    '      "description": "what is being checked",\n'
-    '      "type": "decision",\n'
-    '      "branches": {{\n'
-    '        "yes": {{"label": "condition met", "steps": [{{"title": "...", '
-    '"description": "...", "type": "action"}}]}},\n'
-    '        "no":  {{"label": "condition not met", "steps": [{{"title": "...", '
-    '"description": "...", "type": "action"}}]}}\n'
-    '      }}\n'
-    '    }}\n'
-)
-
-_LOGIC_PROMPT_WITH_CODE = (
-    "Analyze the following nanobot skill and its code. Output a JSON object "
-    "describing the logic pipeline. Respond with ONLY valid JSON — no markdown "
-    "fences, no extra text.\n\n"
-    "## SKILL.md\n```\n{skill_content}\n```\n\n"
-    "## Python / Shell Scripts\n{scripts_section}\n\n"
-    'Output this JSON structure:\n'
-    '{{\n'
-    '  "entry_point": {{"trigger": "one sentence", "icon": "fa-solid fa-<name>"}},\n'
-    '  "steps": [\n'
-    + _STEP_SCHEMA
-    + '    // OR for decision points:\n'
-    + _DECISION_SCHEMA
-    + '  ],\n'
-    '  "dependencies": [{{"name": "...", "description": "..."}}]\n'
-    '}}\n\n'
-    "Rules:\n"
-    "- steps: 4-8 items. Mix action, decision, and output types.\n"
-    "- decision steps MUST have a branches object with yes/no keys, "
-    "each containing a label and 1-3 sub-steps.\n"
-    "- icon: Font Awesome 6 solid icon name\n"
-    "- Keep all text concise"
-)
-
-_LOGIC_PROMPT_NO_CODE = (
-    "Analyze the following nanobot skill (markdown-only, no Python). "
-    "Output a JSON object. Respond with ONLY valid JSON — no markdown "
-    "fences, no extra text.\n\n"
-    "## SKILL.md\n```\n{skill_content}\n```\n\n"
-    'Output this JSON structure:\n'
-    '{{\n'
-    '  "entry_point": {{"trigger": "one sentence", "icon": "fa-solid fa-<name>"}},\n'
-    '  "steps": [\n'
-    + _STEP_SCHEMA
-    + '    // OR for decision points:\n'
-    + _DECISION_SCHEMA
-    + '  ],\n'
-    '  "dependencies": [{{"name": "...", "description": "..."}}],\n'
-    '  "class_design": {{\n'
-    '    "class_name": "ClassName",\n'
-    '    "methods": [{{"name": "method", "description": "what it does"}}]\n'
-    '  }}\n'
-    '}}\n\n'
-    "Rules:\n"
-    "- steps: 4-8 items. Mix action, decision, and output types.\n"
-    "- decision steps MUST have a branches object with yes/no keys, "
-    "each containing a label and 1-3 sub-steps.\n"
-    "- class_design: how this skill WOULD be implemented as a Python class\n"
-    "- icon: Font Awesome 6 solid icon name\n"
-    "- Keep all text concise"
-)
 
 
 def create_app(
@@ -116,6 +43,10 @@ def create_app(
             if not auth.verify_token(token):
                 return JSONResponse({"detail": "unauthorized"}, status_code=401)
         return await call_next(request)
+
+    # ------------------------------------------------------------------
+    # Auth endpoints
+    # ------------------------------------------------------------------
 
     @app.post("/api/auth/register")
     async def register(request: Request):
@@ -145,6 +76,10 @@ def create_app(
         if token is None:
             raise HTTPException(status_code=401, detail="invalid username or password")
         return {"token": token, "username": username}
+
+    # ------------------------------------------------------------------
+    # Chat endpoints
+    # ------------------------------------------------------------------
 
     @app.post("/api/chat/new")
     async def new_session():
@@ -189,6 +124,10 @@ def create_app(
 
         return StreamingResponse(event_stream(), media_type="text/event-stream")
 
+    # ------------------------------------------------------------------
+    # Skills endpoints
+    # ------------------------------------------------------------------
+
     @app.get("/api/skills")
     async def list_skills():
         all_skills = skills_loader.list_skills(filter_unavailable=False)
@@ -230,6 +169,7 @@ def create_app(
 
     @app.post("/api/skills/{name}/generate-logic")
     async def generate_logic(name: str):
+        """Generate pipeline using Python analysis (no LLM call)."""
         skill_dir = _find_skill_dir(skills_loader, name)
         if skill_dir is None:
             raise HTTPException(status_code=404, detail="skill not found")
@@ -237,29 +177,16 @@ def create_app(
         if not skill_content:
             raise HTTPException(status_code=404, detail="skill not found")
 
-        scripts: list[str] = []
-        for ext in ("*.py", "*.sh"):
-            for f in skill_dir.rglob(ext):
-                try:
-                    text = f.read_text(encoding="utf-8")
-                    scripts.append(f"### {f.name}\n```\n{text}\n```")
-                except Exception:
-                    pass
-
-        if scripts:
-            prompt = _LOGIC_PROMPT_WITH_CODE.format(
-                skill_content=skill_content, scripts_section="\n\n".join(scripts),
-            )
-        else:
-            prompt = _LOGIC_PROMPT_NO_CODE.format(skill_content=skill_content)
-
-        result = await agent.process_direct(
-            prompt, session_key=f"web:logic:{name}", channel="web", chat_id="system",
-        )
+        meta = skills_loader.get_skill_metadata(name) or {}
+        result = build_pipeline(name, skill_content, meta, skill_dir)
 
         logic_path = skill_dir / "LOGIC.md"
-        logic_path.write_text(result or "", encoding="utf-8")
-        return {"logic": result or ""}
+        logic_path.write_text(result, encoding="utf-8")
+        return {"logic": result}
+
+    # ------------------------------------------------------------------
+    # Static files
+    # ------------------------------------------------------------------
 
     app.mount("/", StaticFiles(directory=str(STATIC_DIR), html=True), name="static")
     return app
