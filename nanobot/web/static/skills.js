@@ -1,18 +1,39 @@
 /* nanobot skills dashboard */
 (function () {
-    const grid = document.getElementById("skills-grid");
-    const searchInput = document.getElementById("search");
-    const detailPanel = document.getElementById("detail-panel");
-    const detailEmpty = document.getElementById("detail-empty");
-    const detailName = document.getElementById("detail-name");
-    const detailDesc = document.getElementById("detail-desc");
-    const detailBadges = document.getElementById("detail-badges");
-    const detailContent = document.getElementById("detail-content");
+    // -- Auth guard -----------------------------------------------------
+    var token = localStorage.getItem("nanobot_token");
+    if (!token) { window.location.href = "/login.html"; return; }
 
-    let allSkills = [];
-    let activeCard = null;
+    var grid = document.getElementById("skills-grid");
+    var searchInput = document.getElementById("search");
+    var detailPanel = document.getElementById("detail-panel");
+    var detailEmpty = document.getElementById("detail-empty");
+    var detailName = document.getElementById("detail-name");
+    var detailDesc = document.getElementById("detail-desc");
+    var detailBadges = document.getElementById("detail-badges");
+    var detailContent = document.getElementById("detail-content");
+    var logoutBtn = document.getElementById("logout-btn");
+
+    var allSkills = [];
+    var activeCard = null;
 
     // -- Helpers --------------------------------------------------------
+
+    function authHeaders(extra) {
+        var h = { "Authorization": "Bearer " + token };
+        if (extra) { for (var k in extra) { h[k] = extra[k]; } }
+        return h;
+    }
+
+    function handleUnauthorized(resp) {
+        if (resp.status === 401) {
+            localStorage.removeItem("nanobot_token");
+            localStorage.removeItem("nanobot_user");
+            window.location.href = "/login.html";
+            return true;
+        }
+        return false;
+    }
 
     function badge(text, color) {
         return '<span class="inline-block text-xs font-medium px-2 py-0.5 rounded-full ' + color + '">' + text + '</span>';
@@ -20,7 +41,7 @@
 
     function renderMarkdown(text) {
         try { return marked.parse(text); }
-        catch { return text.replace(/</g, "&lt;").replace(/\n/g, "<br>"); }
+        catch (e) { return text.replace(/</g, "&lt;").replace(/\n/g, "<br>"); }
     }
 
     // -- Render skill list ----------------------------------------------
@@ -28,11 +49,11 @@
     function renderCards(skills) {
         grid.innerHTML = "";
         skills.forEach(function (s) {
-            const card = document.createElement("div");
+            var card = document.createElement("div");
             card.className = "skill-card cursor-pointer border border-gray-700 rounded-lg p-4";
             card.dataset.name = s.name;
 
-            let badges = "";
+            var badges = "";
             badges += badge(s.source, s.source === "builtin" ? "bg-purple-800 text-purple-200" : "bg-green-800 text-green-200");
             if (s.always_on) badges += " " + badge("always-on", "bg-yellow-800 text-yellow-200");
             if (!s.available) badges += " " + badge("unavailable", "bg-red-900 text-red-300");
@@ -62,20 +83,23 @@
         detailContent.innerHTML = '<div class="text-gray-500">Loading...</div>';
 
         try {
-            const resp = await fetch("/api/skills/" + encodeURIComponent(name));
+            var resp = await fetch("/api/skills/" + encodeURIComponent(name), {
+                headers: authHeaders(),
+            });
+            if (handleUnauthorized(resp)) return;
             if (!resp.ok) { detailContent.innerHTML = '<div class="text-red-400">Failed to load skill.</div>'; return; }
-            const data = await resp.json();
+            var data = await resp.json();
 
             detailName.textContent = data.name;
             detailDesc.textContent = data.description || "";
 
-            let badges = "";
+            var badges = "";
             badges += badge(data.source, data.source === "builtin" ? "bg-purple-800 text-purple-200" : "bg-green-800 text-green-200");
             if (data.always_on) badges += " " + badge("always-on", "bg-yellow-800 text-yellow-200");
             if (!data.available) badges += " " + badge("unavailable", "bg-red-900 text-red-300");
             detailBadges.innerHTML = badges;
 
-            let html = '<h2 class="text-lg font-bold mb-3">SKILL.md</h2>' + renderMarkdown(data.content || "");
+            var html = '<h2 class="text-lg font-bold mb-3">SKILL.md</h2>' + renderMarkdown(data.content || "");
 
             if (data.logic) {
                 html += '<hr class="my-6 border-gray-700">';
@@ -90,7 +114,6 @@
 
             detailContent.innerHTML = html;
 
-            // Bind generate button
             var genBtn = document.getElementById("gen-logic-btn");
             if (genBtn) {
                 genBtn.addEventListener("click", function () { generateLogic(name); });
@@ -107,9 +130,12 @@
         if (btn) { btn.disabled = true; btn.textContent = "Generating..."; }
 
         try {
-            const resp = await fetch("/api/skills/" + encodeURIComponent(name) + "/generate-logic", { method: "POST" });
+            var resp = await fetch("/api/skills/" + encodeURIComponent(name) + "/generate-logic", {
+                method: "POST",
+                headers: authHeaders(),
+            });
+            if (handleUnauthorized(resp)) return;
             if (!resp.ok) throw new Error("Generation failed");
-            // Reload detail
             await loadDetail(name);
         } catch (err) {
             if (btn) { btn.textContent = "Failed - Retry"; btn.disabled = false; }
@@ -126,12 +152,24 @@
         renderCards(filtered);
     });
 
+    // -- Logout ---------------------------------------------------------
+
+    if (logoutBtn) {
+        logoutBtn.addEventListener("click", function () {
+            localStorage.removeItem("nanobot_token");
+            localStorage.removeItem("nanobot_user");
+            localStorage.removeItem("nanobot_session");
+            window.location.href = "/login.html";
+        });
+    }
+
     // -- Init -----------------------------------------------------------
 
     async function init() {
         try {
-            const resp = await fetch("/api/skills");
-            const data = await resp.json();
+            var resp = await fetch("/api/skills", { headers: authHeaders() });
+            if (handleUnauthorized(resp)) return;
+            var data = await resp.json();
             allSkills = data.skills || [];
             renderCards(allSkills);
         } catch (err) {

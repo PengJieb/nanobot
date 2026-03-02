@@ -3,13 +3,16 @@
 from __future__ import annotations
 
 import asyncio
+import json as _json
 import uuid
 from pathlib import Path
 from typing import TYPE_CHECKING
 
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import StreamingResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
+
+from nanobot.web.auth import AuthManager
 
 if TYPE_CHECKING:
     from nanobot.agent.loop import AgentLoop
@@ -17,10 +20,83 @@ if TYPE_CHECKING:
 
 STATIC_DIR = Path(__file__).parent / "static"
 
+# Paths that do NOT require authentication
+_PUBLIC_PATHS = {"/api/auth/login", "/api/auth/register"}
+_PUBLIC_PREFIXES = ("/login.html", "/style.css")
 
-def create_app(agent: AgentLoop, skills_loader: SkillsLoader) -> FastAPI:
+
+def create_app(
+    agent: AgentLoop,
+    skills_loader: SkillsLoader,
+    auth: AuthManager | None = None,
+) -> FastAPI:
     """Create the FastAPI application with all routes."""
     app = FastAPI(title="nanobot web")
+
+    # ------------------------------------------------------------------
+    # Auth middleware
+    # ------------------------------------------------------------------
+
+    @app.middleware("http")
+    async def auth_middleware(request: Request, call_next):
+        path = request.url.path
+
+        # Public paths — always allowed
+        if auth is None or path in _PUBLIC_PATHS or path.startswith(_PUBLIC_PREFIXES):
+            return await call_next(request)
+
+        # Static assets at root that aren't pages (css/js) — allow
+        # Let login.html and API auth endpoints through; block everything else
+        if path.startswith("/api/"):
+            token = request.headers.get("Authorization", "").removeprefix("Bearer ").strip()
+            if not auth.verify_token(token):
+                return JSONResponse({"detail": "unauthorized"}, status_code=401)
+        else:
+            # For HTML pages (except login.html), let the browser load them.
+            # The JS on each page will check auth and redirect to login if needed.
+            pass
+
+        return await call_next(request)
+
+    # ------------------------------------------------------------------
+    # Auth endpoints
+    # ------------------------------------------------------------------
+
+    @app.post("/api/auth/register")
+    async def register(request: Request):
+        body = await request.json()
+        username = (body.get("username") or "").strip()
+        password = body.get("password") or ""
+        invite_code = (body.get("invite_code") or "").strip()
+
+        if not username or not password:
+            raise HTTPException(status_code=400, detail="username and password required")
+
+        if auth is None:
+            # No auth configured — registration is a no-op, return a dummy token
+            return {"token": "no-auth", "username": username}
+
+        token = auth.register(username, password, invite_code)
+        if token is None:
+            raise HTTPException(status_code=403, detail="invalid invite code or username taken")
+        return {"token": token, "username": username}
+
+    @app.post("/api/auth/login")
+    async def login(request: Request):
+        body = await request.json()
+        username = (body.get("username") or "").strip()
+        password = body.get("password") or ""
+
+        if not username or not password:
+            raise HTTPException(status_code=400, detail="username and password required")
+
+        if auth is None:
+            return {"token": "no-auth", "username": username}
+
+        token = auth.login(username, password)
+        if token is None:
+            raise HTTPException(status_code=401, detail="invalid username or password")
+        return {"token": token, "username": username}
 
     # ------------------------------------------------------------------
     # Chat endpoints
@@ -65,9 +141,8 @@ def create_app(agent: AgentLoop, skills_loader: SkillsLoader) -> FastAPI:
                 try:
                     event = await asyncio.wait_for(queue.get(), timeout=120)
                 except asyncio.TimeoutError:
-                    yield "data: {\"type\": \"error\", \"content\": \"timeout\"}\n\n"
+                    yield 'data: {"type": "error", "content": "timeout"}\n\n'
                     break
-                import json as _json
                 yield f"data: {_json.dumps(event)}\n\n"
                 if event["type"] in ("done", "error"):
                     break
@@ -111,7 +186,6 @@ def create_app(agent: AgentLoop, skills_loader: SkillsLoader) -> FastAPI:
         available = skills_loader._check_requirements(skill_meta)
         always_on = bool(skill_meta.get("always") or meta.get("always"))
 
-        # Find skill dir to check LOGIC.md
         skill_dir = _find_skill_dir(skills_loader, name)
         logic_content = None
         if skill_dir and (skill_dir / "LOGIC.md").exists():
@@ -137,7 +211,6 @@ def create_app(agent: AgentLoop, skills_loader: SkillsLoader) -> FastAPI:
         if not skill_content:
             raise HTTPException(status_code=404, detail="skill not found")
 
-        # Collect scripts in the skill directory
         scripts: list[str] = []
         for ext in ("*.py", "*.sh"):
             for f in skill_dir.rglob(ext):

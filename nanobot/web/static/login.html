@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>nanobot - Login</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="/style.css">
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: { extend: {} }
+        }
+    </script>
+</head>
+<body class="h-full bg-gray-900 text-gray-100 flex items-center justify-center dark">
+    <div class="w-full max-w-sm px-6">
+        <h1 class="text-3xl font-bold text-center mb-8">🤖 nanobot</h1>
+
+        <!-- Tab switcher -->
+        <div class="flex mb-6 border-b border-gray-700">
+            <button id="tab-login" class="flex-1 py-2 text-center font-medium text-blue-400 border-b-2 border-blue-400"
+                onclick="switchTab('login')">Login</button>
+            <button id="tab-register" class="flex-1 py-2 text-center font-medium text-gray-400 border-b-2 border-transparent hover:text-gray-200"
+                onclick="switchTab('register')">Register</button>
+        </div>
+
+        <!-- Login form -->
+        <form id="login-form" class="space-y-4" onsubmit="return handleLogin(event)">
+            <div>
+                <label class="block text-sm text-gray-400 mb-1">Username</label>
+                <input id="login-username" type="text" required autocomplete="username"
+                    class="w-full bg-gray-700 text-gray-100 rounded-lg px-4 py-2.5 outline-none focus:ring-2 focus:ring-blue-500 placeholder-gray-400">
+            </div>
+            <div>
+                <label class="block text-sm text-gray-400 mb-1">Password</label>
+                <input id="login-password" type="password" required autocomplete="current-password"
+                    class="w-full bg-gray-700 text-gray-100 rounded-lg px-4 py-2.5 outline-none focus:ring-2 focus:ring-blue-500 placeholder-gray-400">
+            </div>
+            <div id="login-error" class="text-red-400 text-sm hidden"></div>
+            <button type="submit" class="w-full bg-blue-600 hover:bg-blue-500 text-white py-2.5 rounded-lg font-medium transition">
+                Login
+            </button>
+        </form>
+
+        <!-- Register form -->
+        <form id="register-form" class="space-y-4 hidden" onsubmit="return handleRegister(event)">
+            <div>
+                <label class="block text-sm text-gray-400 mb-1">Username</label>
+                <input id="reg-username" type="text" required autocomplete="username"
+                    class="w-full bg-gray-700 text-gray-100 rounded-lg px-4 py-2.5 outline-none focus:ring-2 focus:ring-blue-500 placeholder-gray-400">
+            </div>
+            <div>
+                <label class="block text-sm text-gray-400 mb-1">Password</label>
+                <input id="reg-password" type="password" required autocomplete="new-password"
+                    class="w-full bg-gray-700 text-gray-100 rounded-lg px-4 py-2.5 outline-none focus:ring-2 focus:ring-blue-500 placeholder-gray-400">
+            </div>
+            <div>
+                <label class="block text-sm text-gray-400 mb-1">Invite Code</label>
+                <input id="reg-invite" type="text" required
+                    class="w-full bg-gray-700 text-gray-100 rounded-lg px-4 py-2.5 outline-none focus:ring-2 focus:ring-blue-500 placeholder-gray-400"
+                    placeholder="Enter invite code">
+            </div>
+            <div id="reg-error" class="text-red-400 text-sm hidden"></div>
+            <button type="submit" class="w-full bg-blue-600 hover:bg-blue-500 text-white py-2.5 rounded-lg font-medium transition">
+                Register
+            </button>
+        </form>
+    </div>
+
+    <script>
+        function switchTab(tab) {
+            var loginForm = document.getElementById("login-form");
+            var regForm = document.getElementById("register-form");
+            var tabLogin = document.getElementById("tab-login");
+            var tabReg = document.getElementById("tab-register");
+
+            if (tab === "login") {
+                loginForm.classList.remove("hidden");
+                regForm.classList.add("hidden");
+                tabLogin.className = "flex-1 py-2 text-center font-medium text-blue-400 border-b-2 border-blue-400";
+                tabReg.className = "flex-1 py-2 text-center font-medium text-gray-400 border-b-2 border-transparent hover:text-gray-200";
+            } else {
+                loginForm.classList.add("hidden");
+                regForm.classList.remove("hidden");
+                tabReg.className = "flex-1 py-2 text-center font-medium text-blue-400 border-b-2 border-blue-400";
+                tabLogin.className = "flex-1 py-2 text-center font-medium text-gray-400 border-b-2 border-transparent hover:text-gray-200";
+            }
+        }
+
+        async function handleLogin(e) {
+            e.preventDefault();
+            var errEl = document.getElementById("login-error");
+            errEl.classList.add("hidden");
+
+            var username = document.getElementById("login-username").value.trim();
+            var password = document.getElementById("login-password").value;
+
+            try {
+                var resp = await fetch("/api/auth/login", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ username: username, password: password }),
+                });
+                if (!resp.ok) {
+                    var data = await resp.json();
+                    errEl.textContent = data.detail || "Login failed";
+                    errEl.classList.remove("hidden");
+                    return false;
+                }
+                var data = await resp.json();
+                localStorage.setItem("nanobot_token", data.token);
+                localStorage.setItem("nanobot_user", data.username);
+                window.location.href = "/";
+            } catch (err) {
+                errEl.textContent = "Connection error";
+                errEl.classList.remove("hidden");
+            }
+            return false;
+        }
+
+        async function handleRegister(e) {
+            e.preventDefault();
+            var errEl = document.getElementById("reg-error");
+            errEl.classList.add("hidden");
+
+            var username = document.getElementById("reg-username").value.trim();
+            var password = document.getElementById("reg-password").value;
+            var invite = document.getElementById("reg-invite").value.trim();
+
+            try {
+                var resp = await fetch("/api/auth/register", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ username: username, password: password, invite_code: invite }),
+                });
+                if (!resp.ok) {
+                    var data = await resp.json();
+                    errEl.textContent = data.detail || "Registration failed";
+                    errEl.classList.remove("hidden");
+                    return false;
+                }
+                var data = await resp.json();
+                localStorage.setItem("nanobot_token", data.token);
+                localStorage.setItem("nanobot_user", data.username);
+                window.location.href = "/";
+            } catch (err) {
+                errEl.textContent = "Connection error";
+                errEl.classList.remove("hidden");
+            }
+            return false;
+        }
+
+        // If already logged in, redirect
+        if (localStorage.getItem("nanobot_token")) {
+            window.location.href = "/";
+        }
+    </script>
+</body>
+</html>

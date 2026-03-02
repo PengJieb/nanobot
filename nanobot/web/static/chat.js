@@ -1,31 +1,59 @@
 /* nanobot chat UI */
 (function () {
-    const messagesEl = document.getElementById("messages");
-    const typingEl = document.getElementById("typing");
-    const typingText = document.getElementById("typing-text");
-    const form = document.getElementById("chat-form");
-    const input = document.getElementById("input");
-    const sendBtn = document.getElementById("send-btn");
-    const newChatBtn = document.getElementById("new-chat-btn");
+    // -- Auth guard -----------------------------------------------------
+    var token = localStorage.getItem("nanobot_token");
+    if (!token) { window.location.href = "/login.html"; return; }
 
-    let sessionKey = localStorage.getItem("nanobot_session") || null;
-    let busy = false;
+    var messagesEl = document.getElementById("messages");
+    var typingEl = document.getElementById("typing");
+    var typingText = document.getElementById("typing-text");
+    var form = document.getElementById("chat-form");
+    var input = document.getElementById("input");
+    var sendBtn = document.getElementById("send-btn");
+    var newChatBtn = document.getElementById("new-chat-btn");
+    var logoutBtn = document.getElementById("logout-btn");
+
+    var sessionKey = localStorage.getItem("nanobot_session") || null;
+    var busy = false;
 
     // -- Helpers --------------------------------------------------------
 
+    function generateId() {
+        // Compatible fallback for crypto.randomUUID
+        var arr = new Uint8Array(6);
+        (window.crypto || window.msCrypto).getRandomValues(arr);
+        return Array.from(arr, function (b) { return b.toString(16).padStart(2, "0"); }).join("");
+    }
+
+    function authHeaders(extra) {
+        var h = { "Authorization": "Bearer " + token };
+        if (extra) { for (var k in extra) { h[k] = extra[k]; } }
+        return h;
+    }
+
+    function handleUnauthorized(resp) {
+        if (resp.status === 401) {
+            localStorage.removeItem("nanobot_token");
+            localStorage.removeItem("nanobot_user");
+            window.location.href = "/login.html";
+            return true;
+        }
+        return false;
+    }
+
     function getSessionKey() {
         if (!sessionKey) {
-            sessionKey = "web:" + crypto.randomUUID().replace(/-/g, "").slice(0, 12);
+            sessionKey = "web:" + generateId();
             localStorage.setItem("nanobot_session", sessionKey);
         }
         return sessionKey;
     }
 
     function addMessage(role, html) {
-        const wrapper = document.createElement("div");
+        var wrapper = document.createElement("div");
         wrapper.className = "max-w-3xl mx-auto flex " + (role === "user" ? "justify-end" : "justify-start");
 
-        const bubble = document.createElement("div");
+        var bubble = document.createElement("div");
         bubble.className = role === "user"
             ? "bg-blue-600 text-white rounded-2xl rounded-br-md px-4 py-2.5 max-w-[80%] msg-content"
             : "bg-gray-700 text-gray-100 rounded-2xl rounded-bl-md px-4 py-2.5 max-w-[80%] msg-content";
@@ -39,11 +67,11 @@
 
     function renderMarkdown(text) {
         try { return marked.parse(text); }
-        catch { return text.replace(/</g, "&lt;").replace(/\n/g, "<br>"); }
+        catch (e) { return text.replace(/</g, "&lt;").replace(/\n/g, "<br>"); }
     }
 
     function escapeHtml(text) {
-        const el = document.createElement("span");
+        var el = document.createElement("span");
         el.textContent = text;
         return el.innerHTML;
     }
@@ -77,7 +105,7 @@
 
     form.addEventListener("submit", async function (e) {
         e.preventDefault();
-        const text = input.value.trim();
+        var text = input.value.trim();
         if (!text || busy) return;
 
         addMessage("user", escapeHtml(text));
@@ -86,33 +114,36 @@
         setBusy(true);
         setTyping(true, "nanobot is thinking");
 
-        let assistantBubble = null;
-        let fullContent = "";
+        var assistantBubble = null;
+        var fullContent = "";
 
         try {
-            const resp = await fetch("/api/chat", {
+            var resp = await fetch("/api/chat", {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
+                headers: authHeaders({ "Content-Type": "application/json" }),
                 body: JSON.stringify({ message: text, session_key: getSessionKey() }),
             });
 
-            const reader = resp.body.getReader();
-            const decoder = new TextDecoder();
-            let buffer = "";
+            if (handleUnauthorized(resp)) return;
+
+            var reader = resp.body.getReader();
+            var decoder = new TextDecoder();
+            var buffer = "";
 
             while (true) {
-                const { done, value } = await reader.read();
-                if (done) break;
-                buffer += decoder.decode(value, { stream: true });
+                var chunk = await reader.read();
+                if (chunk.done) break;
+                buffer += decoder.decode(chunk.value, { stream: true });
 
-                const lines = buffer.split("\n");
-                buffer = lines.pop(); // keep incomplete line
+                var lines = buffer.split("\n");
+                buffer = lines.pop();
 
-                for (const line of lines) {
+                for (var i = 0; i < lines.length; i++) {
+                    var line = lines[i];
                     if (!line.startsWith("data: ")) continue;
-                    let event;
+                    var event;
                     try { event = JSON.parse(line.slice(6)); }
-                    catch { continue; }
+                    catch (ex) { continue; }
 
                     if (event.type === "progress") {
                         setTyping(true, event.content || "working...");
@@ -131,7 +162,6 @@
                 }
             }
 
-            // If no done event received, hide typing
             setTyping(false);
         } catch (err) {
             setTyping(false);
@@ -146,17 +176,32 @@
 
     newChatBtn.addEventListener("click", async function () {
         try {
-            const resp = await fetch("/api/chat/new", { method: "POST" });
-            const data = await resp.json();
+            var resp = await fetch("/api/chat/new", {
+                method: "POST",
+                headers: authHeaders(),
+            });
+            if (handleUnauthorized(resp)) return;
+            var data = await resp.json();
             sessionKey = data.session_key;
             localStorage.setItem("nanobot_session", sessionKey);
-        } catch {
+        } catch (ex) {
             sessionKey = null;
             localStorage.removeItem("nanobot_session");
         }
         messagesEl.innerHTML = "";
         input.focus();
     });
+
+    // -- Logout ---------------------------------------------------------
+
+    if (logoutBtn) {
+        logoutBtn.addEventListener("click", function () {
+            localStorage.removeItem("nanobot_token");
+            localStorage.removeItem("nanobot_user");
+            localStorage.removeItem("nanobot_session");
+            window.location.href = "/login.html";
+        });
+    }
 
     // -- Init -----------------------------------------------------------
     input.focus();

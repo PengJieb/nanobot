@@ -580,6 +580,7 @@ def agent(
 def web(
     port: int = typer.Option(8080, "--port", "-p", help="Server port"),
     host: str = typer.Option("127.0.0.1", "--host", "-H", help="Bind address"),
+    invite_code: str = typer.Option("", "--invite-code", "-i", help="Invite code for registration"),
     verbose: bool = typer.Option(False, "--verbose", "-v", help="Verbose output"),
 ):
     """Start the web UI (chat + skills dashboard)."""
@@ -596,6 +597,7 @@ def web(
     from nanobot.agent.loop import AgentLoop
     from nanobot.agent.skills import SkillsLoader
     from nanobot.cron.service import CronService
+    from nanobot.web.auth import AuthManager
     from nanobot.web.server import create_app
 
     if verbose:
@@ -629,9 +631,15 @@ def web(
     )
 
     skills_loader = SkillsLoader(config.workspace_path)
-    fastapi_app = create_app(agent_loop, skills_loader)
+
+    auth_store = get_data_dir() / "web" / "users.json"
+    auth = AuthManager(auth_store, invite_code=invite_code)
+
+    fastapi_app = create_app(agent_loop, skills_loader, auth=auth)
 
     console.print(f"{__logo__} Starting nanobot web UI at http://{host}:{port}")
+    if invite_code:
+        console.print(f"[green]✓[/green] Registration requires invite code")
     uvicorn.run(fastapi_app, host=host, port=port, log_level="info" if verbose else "warning")
 
 
