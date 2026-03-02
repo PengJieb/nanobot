@@ -1,0 +1,134 @@
+/* nanobot web UI styles */
+
+/* Typing dots animation */
+.typing-dots span {
+    animation: blink 1.4s infinite both;
+    font-size: 1.5rem;
+    line-height: 1;
+}
+.typing-dots span:nth-child(2) { animation-delay: 0.2s; }
+.typing-dots span:nth-child(3) { animation-delay: 0.4s; }
+
+@keyframes blink {
+    0%, 80%, 100% { opacity: 0; }
+    40% { opacity: 1; }
+}
+
+/* Markdown inside messages */
+.msg-content h1,
+.msg-content h2,
+.msg-content h3 {
+    font-weight: 700;
+    margin-top: 0.75em;
+    margin-bottom: 0.25em;
+}
+.msg-content h1 { font-size: 1.25rem; }
+.msg-content h2 { font-size: 1.125rem; }
+.msg-content h3 { font-size: 1rem; }
+
+.msg-content p { margin: 0.5em 0; }
+
+.msg-content ul, .msg-content ol {
+    padding-left: 1.5em;
+    margin: 0.5em 0;
+}
+.msg-content ul { list-style-type: disc; }
+.msg-content ol { list-style-type: decimal; }
+
+.msg-content code {
+    background: rgba(255,255,255,0.1);
+    padding: 0.15em 0.35em;
+    border-radius: 4px;
+    font-size: 0.875em;
+}
+
+.msg-content pre {
+    background: #1a1a2e;
+    border-radius: 8px;
+    padding: 1em;
+    overflow-x: auto;
+    margin: 0.75em 0;
+}
+.msg-content pre code {
+    background: none;
+    padding: 0;
+}
+
+.msg-content blockquote {
+    border-left: 3px solid #4b5563;
+    padding-left: 1em;
+    color: #9ca3af;
+    margin: 0.5em 0;
+}
+
+.msg-content a {
+    color: #60a5fa;
+    text-decoration: underline;
+}
+
+.msg-content table {
+    border-collapse: collapse;
+    margin: 0.75em 0;
+    width: 100%;
+}
+.msg-content th, .msg-content td {
+    border: 1px solid #374151;
+    padding: 0.5em 0.75em;
+    text-align: left;
+}
+.msg-content th {
+    background: rgba(255,255,255,0.05);
+    font-weight: 600;
+}
+
+/* Prose overrides for skill detail panel */
+.prose-invert h1, .prose-invert h2, .prose-invert h3 {
+    color: #f3f4f6;
+    font-weight: 700;
+    margin-top: 1em;
+    margin-bottom: 0.5em;
+}
+.prose-invert h1 { font-size: 1.5rem; }
+.prose-invert h2 { font-size: 1.25rem; }
+.prose-invert h3 { font-size: 1.1rem; }
+.prose-invert p { margin: 0.5em 0; color: #d1d5db; }
+.prose-invert ul, .prose-invert ol {
+    padding-left: 1.5em;
+    margin: 0.5em 0;
+    color: #d1d5db;
+}
+.prose-invert ul { list-style-type: disc; }
+.prose-invert ol { list-style-type: decimal; }
+.prose-invert code {
+    background: rgba(255,255,255,0.1);
+    padding: 0.15em 0.35em;
+    border-radius: 4px;
+    font-size: 0.875em;
+}
+.prose-invert pre {
+    background: #1a1a2e;
+    border-radius: 8px;
+    padding: 1em;
+    overflow-x: auto;
+    margin: 0.75em 0;
+}
+.prose-invert pre code { background: none; padding: 0; }
+.prose-invert a { color: #60a5fa; text-decoration: underline; }
+
+/* Skill card hover */
+.skill-card {
+    transition: background-color 0.15s ease;
+}
+.skill-card:hover {
+    background-color: rgba(255,255,255,0.05);
+}
+.skill-card.active {
+    background-color: rgba(59, 130, 246, 0.15);
+    border-color: #3b82f6;
+}
+
+/* Auto-resize textarea */
+#input {
+    max-height: 200px;
+    overflow-y: auto;
+}

@@ -572,6 +572,70 @@ def agent(
 
 
 # ============================================================================
+# Web UI
+# ============================================================================
+
+
+@app.command()
+def web(
+    port: int = typer.Option(8080, "--port", "-p", help="Server port"),
+    host: str = typer.Option("127.0.0.1", "--host", "-H", help="Bind address"),
+    verbose: bool = typer.Option(False, "--verbose", "-v", help="Verbose output"),
+):
+    """Start the web UI (chat + skills dashboard)."""
+    try:
+        import uvicorn  # noqa: F811
+        from fastapi import FastAPI as _FA  # noqa: F401,F811
+    except ImportError:
+        console.print("[red]Web dependencies not installed. Run:[/red]")
+        console.print("  pip install nanobot-ai[web]")
+        raise typer.Exit(1)
+
+    from nanobot.config.loader import load_config, get_data_dir
+    from nanobot.bus.queue import MessageBus
+    from nanobot.agent.loop import AgentLoop
+    from nanobot.agent.skills import SkillsLoader
+    from nanobot.cron.service import CronService
+    from nanobot.web.server import create_app
+
+    if verbose:
+        import logging
+        logging.basicConfig(level=logging.DEBUG)
+
+    config = load_config()
+    sync_workspace_templates(config.workspace_path)
+
+    bus = MessageBus()
+    provider = _make_provider(config)
+
+    cron_store_path = get_data_dir() / "cron" / "jobs.json"
+    cron = CronService(cron_store_path)
+
+    agent_loop = AgentLoop(
+        bus=bus,
+        provider=provider,
+        workspace=config.workspace_path,
+        model=config.agents.defaults.model,
+        temperature=config.agents.defaults.temperature,
+        max_tokens=config.agents.defaults.max_tokens,
+        max_iterations=config.agents.defaults.max_tool_iterations,
+        memory_window=config.agents.defaults.memory_window,
+        brave_api_key=config.tools.web.search.api_key or None,
+        exec_config=config.tools.exec,
+        cron_service=cron,
+        restrict_to_workspace=config.tools.restrict_to_workspace,
+        mcp_servers=config.tools.mcp_servers,
+        channels_config=config.channels,
+    )
+
+    skills_loader = SkillsLoader(config.workspace_path)
+    fastapi_app = create_app(agent_loop, skills_loader)
+
+    console.print(f"{__logo__} Starting nanobot web UI at http://{host}:{port}")
+    uvicorn.run(fastapi_app, host=host, port=port, log_level="info" if verbose else "warning")
+
+
+# ============================================================================
 # Channel Commands
 # ============================================================================
 

@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>nanobot - Chat</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <link rel="stylesheet" href="/style.css">
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: { extend: {} }
+        }
+    </script>
+</head>
+<body class="h-full bg-gray-900 text-gray-100 flex flex-col dark">
+    <!-- Nav -->
+    <nav class="bg-gray-800 border-b border-gray-700 px-6 py-3 flex items-center justify-between shrink-0">
+        <div class="flex items-center gap-4">
+            <span class="text-xl font-bold tracking-tight">🤖 nanobot</span>
+            <a href="/" class="text-blue-400 font-medium hover:underline">Chat</a>
+            <a href="/skills.html" class="text-gray-400 hover:text-gray-200">Skills</a>
+        </div>
+        <button id="new-chat-btn" class="text-sm bg-gray-700 hover:bg-gray-600 px-3 py-1.5 rounded-md transition">
+            + New Chat
+        </button>
+    </nav>
+
+    <!-- Messages -->
+    <div id="messages" class="flex-1 overflow-y-auto px-4 py-6 space-y-4"></div>
+
+    <!-- Typing indicator -->
+    <div id="typing" class="hidden px-6 pb-2">
+        <div class="flex items-center gap-2 text-gray-400 text-sm">
+            <span class="typing-dots"><span>.</span><span>.</span><span>.</span></span>
+            <span id="typing-text">nanobot is thinking</span>
+        </div>
+    </div>
+
+    <!-- Input -->
+    <div class="border-t border-gray-700 bg-gray-800 px-4 py-3 shrink-0">
+        <form id="chat-form" class="max-w-3xl mx-auto flex gap-3">
+            <textarea
+                id="input"
+                rows="1"
+                placeholder="Send a message..."
+                class="flex-1 bg-gray-700 text-gray-100 rounded-lg px-4 py-2.5 resize-none outline-none focus:ring-2 focus:ring-blue-500 placeholder-gray-400"
+            ></textarea>
+            <button type="submit" id="send-btn"
+                class="bg-blue-600 hover:bg-blue-500 text-white px-5 py-2.5 rounded-lg font-medium transition disabled:opacity-40 disabled:cursor-not-allowed">
+                Send
+            </button>
+        </form>
+    </div>
+
+    <script src="/chat.js"></script>
+</body>
+</html>
