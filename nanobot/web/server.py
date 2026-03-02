@@ -26,7 +26,7 @@ _PUBLIC_PREFIXES = ("/login.html", "/style.css")
 
 # Prompt for skills WITH existing Python code
 _LOGIC_PROMPT_WITH_CODE = """\
-Analyze the following nanobot skill and generate a **logic pipeline** document.
+Analyze the following nanobot skill and generate a logic pipeline as a Mermaid flowchart.
 
 ## SKILL.md
 ```
@@ -36,58 +36,78 @@ Analyze the following nanobot skill and generate a **logic pipeline** document.
 ## Python / Shell Scripts
 {scripts_section}
 
-Generate a concise LOGIC.md describing the execution pipeline:
-
-# Running Logic
+Generate a LOGIC.md with this EXACT structure:
 
 ## Entry Point
-- The primary class/function and how it is triggered
+One line: how the skill is triggered.
 
 ## Pipeline
-1. Step-by-step execution flow (numbered)
-2. Key method calls, data transformations, decision points
-3. Show the flow as: Input → Process → Output
+```mermaid
+flowchart TD
+    A["Step 1: trigger description"] --> B["Step 2: action"]
+    B --> C{{Decision point}}
+    C -->|yes| D["Step 3a: action"]
+    C -->|no| E["Step 3b: fallback"]
+    D --> F["Step 4: output"]
+    E --> F
+```
 
 ## Dependencies
-- External libraries, tools, APIs, or environment variables required
+Bullet list of external tools, libraries, APIs, or env vars required.
 
-Write ONLY the markdown content. Do not wrap in code fences.\
+Rules for the mermaid flowchart:
+- Use flowchart TD (top-down)
+- Use rectangle nodes ["..."] for actions, rounded ("...") for start/end, diamond {{"..."}} for decisions
+- Keep node labels short (under 8 words)
+- Include 4-10 nodes that cover the real execution flow
+- Use descriptive edge labels where needed
+
+Write ONLY the LOGIC.md content. Do not add outer code fences.\
 """
 
 # Prompt for skills WITHOUT Python code — instruct py-writer style reconstruction
 _LOGIC_PROMPT_NO_CODE = """\
-Analyze the following nanobot skill and generate a **logic pipeline** document.
+Analyze the following nanobot skill and generate a logic pipeline as a Mermaid flowchart.
 
-This skill currently has NO Python implementation. Describe its execution logic \
-as if it were implemented following the py-writer class-centric pattern \
-(one primary class, module-level functions delegate to the class).
+This skill has NO Python implementation — it is a markdown-only skill. \
+Describe its execution logic as if it were implemented following the \
+py-writer class-centric pattern (one primary class with public methods).
 
 ## SKILL.md
 ```
 {skill_content}
 ```
 
-Generate a concise LOGIC.md that reconstructs the skill's logic pipeline:
-
-# Running Logic
+Generate a LOGIC.md with this EXACT structure:
 
 ## Entry Point
-- How the skill is triggered (user message, always-on injection, tool call)
-- What the hypothetical primary class would be named and how it is instantiated
+One line: how the skill is triggered (user message, always-on injection, or tool call).
 
 ## Pipeline
-1. Step-by-step execution flow (numbered)
-2. For each step describe: trigger → action → output
-3. Include tool calls, external commands, or API requests the skill instructs
+```mermaid
+flowchart TD
+    A["Step 1: trigger description"] --> B["Step 2: action"]
+    B --> C{{Decision point}}
+    C -->|yes| D["Step 3a: action"]
+    C -->|no| E["Step 3b: fallback"]
+    D --> F["Step 4: output"]
+    E --> F
+```
 
 ## Dependencies
-- External tools (CLI binaries), APIs, environment variables, or services required
+Bullet list of external tools, CLI binaries, APIs, or env vars required.
 
-## Reconstructed Class Design
-- Primary class name and constructor parameters
-- Key public methods and their responsibilities
+## Reconstructed Class
+Primary class name, constructor params, and key public methods (bullet list).
 
-Write ONLY the markdown content. Do not wrap in code fences.\
+Rules for the mermaid flowchart:
+- Use flowchart TD (top-down)
+- Use rectangle nodes ["..."] for actions, rounded ("...") for start/end, diamond {{"..."}} for decisions
+- Keep node labels short (under 8 words)
+- Include 4-10 nodes that cover the real execution flow
+- Use descriptive edge labels where needed
+
+Write ONLY the LOGIC.md content. Do not add outer code fences.\
 """
 
 
