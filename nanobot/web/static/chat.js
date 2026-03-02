@@ -16,10 +16,41 @@
     var sessionKey = localStorage.getItem("nanobot_session") || null;
     var busy = false;
 
+    // -- Chat history persistence (survives navigation, cleared on New Chat) --
+    var HISTORY_KEY = "nanobot_chat_history";
+
+    /** Append a message to sessionStorage history. */
+    function saveMessage(role, content) {
+        var history = _loadHistory();
+        history.push({ role: role, content: content });
+        sessionStorage.setItem(HISTORY_KEY, JSON.stringify(history));
+    }
+
+    function _loadHistory() {
+        try { return JSON.parse(sessionStorage.getItem(HISTORY_KEY)) || []; }
+        catch (e) { return []; }
+    }
+
+    function clearHistory() {
+        sessionStorage.removeItem(HISTORY_KEY);
+    }
+
+    /** Restore chat bubbles from sessionStorage on page load. */
+    function restoreHistory() {
+        var history = _loadHistory();
+        for (var i = 0; i < history.length; i++) {
+            var msg = history[i];
+            if (msg.role === "user") {
+                _addBubble("user", escapeHtml(msg.content));
+            } else {
+                _addBubble("assistant", renderMarkdown(msg.content));
+            }
+        }
+    }
+
     // -- Helpers --------------------------------------------------------
 
     function generateId() {
-        // Compatible fallback for crypto.randomUUID
         var arr = new Uint8Array(6);
         (window.crypto || window.msCrypto).getRandomValues(arr);
         return Array.from(arr, function (b) { return b.toString(16).padStart(2, "0"); }).join("");
@@ -49,7 +80,8 @@
         return sessionKey;
     }
 
-    function addMessage(role, html) {
+    /** Add a bubble to the DOM (no persistence). */
+    function _addBubble(role, html) {
         var wrapper = document.createElement("div");
         wrapper.className = "max-w-3xl mx-auto flex " + (role === "user" ? "justify-end" : "justify-start");
 
@@ -62,6 +94,15 @@
         wrapper.appendChild(bubble);
         messagesEl.appendChild(wrapper);
         messagesEl.scrollTop = messagesEl.scrollHeight;
+        return bubble;
+    }
+
+    /** Add a bubble + persist to sessionStorage. */
+    function addMessage(role, html, rawContent) {
+        var bubble = _addBubble(role, html);
+        if (rawContent !== undefined) {
+            saveMessage(role, rawContent);
+        }
         return bubble;
     }
 
@@ -108,7 +149,7 @@
         var text = input.value.trim();
         if (!text || busy) return;
 
-        addMessage("user", escapeHtml(text));
+        addMessage("user", escapeHtml(text), text);
         input.value = "";
         input.style.height = "auto";
         setBusy(true);
@@ -151,13 +192,17 @@
                         fullContent = event.content || "";
                         setTyping(false);
                         if (!assistantBubble) {
-                            assistantBubble = addMessage("assistant", renderMarkdown(fullContent));
+                            assistantBubble = addMessage("assistant", renderMarkdown(fullContent), fullContent);
                         } else {
                             assistantBubble.innerHTML = renderMarkdown(fullContent);
+                            // Update last assistant message in history
+                            saveMessage("assistant", fullContent);
                         }
                     } else if (event.type === "error") {
                         setTyping(false);
-                        addMessage("assistant", "<span class='text-red-400'>Error: " + escapeHtml(event.content) + "</span>");
+                        addMessage("assistant",
+                            "<span class='text-red-400'>Error: " + escapeHtml(event.content) + "</span>",
+                            "Error: " + event.content);
                     }
                 }
             }
@@ -165,7 +210,9 @@
             setTyping(false);
         } catch (err) {
             setTyping(false);
-            addMessage("assistant", "<span class='text-red-400'>Connection error: " + escapeHtml(err.message) + "</span>");
+            addMessage("assistant",
+                "<span class='text-red-400'>Connection error: " + escapeHtml(err.message) + "</span>",
+                "Connection error: " + err.message);
         }
 
         setBusy(false);
@@ -188,6 +235,7 @@
             sessionKey = null;
             localStorage.removeItem("nanobot_session");
         }
+        clearHistory();
         messagesEl.innerHTML = "";
         input.focus();
     });
@@ -199,10 +247,12 @@
             localStorage.removeItem("nanobot_token");
             localStorage.removeItem("nanobot_user");
             localStorage.removeItem("nanobot_session");
+            clearHistory();
             window.location.href = "/login.html";
         });
     }
 
     // -- Init -----------------------------------------------------------
+    restoreHistory();
     input.focus();
 })();
