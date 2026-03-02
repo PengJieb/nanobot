@@ -156,6 +156,11 @@ body.col-resizing {
     user-select: none;
 }
 
+/* Collapsible step details */
+.step-expand summary::-webkit-details-marker { display: none; }
+.step-expand[open] .expand-icon { transform: rotate(45deg); }
+.step-expand summary:hover { color: #93c5fd !important; }
+
 /* Pipeline card hover */
 .pipe-card {
     transition: all 0.2s ease;

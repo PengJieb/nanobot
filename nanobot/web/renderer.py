@@ -121,20 +121,25 @@ def _render_steps(steps: list[dict], depth: int) -> str:
         if desc:
             h += f'<p class="text-sm text-gray-400 mt-0.5">{_esc(desc)}</p>'
 
-        # Detail bullets
+        # Collapsible details + code snippet
         details = s.get("details", [])
-        if details:
-            h += '<ul style="margin:0.4rem 0 0 1rem;padding:0;list-style:disc">'
-            for d in details:
-                h += f'<li style="color:#9ca3af;font-size:0.8rem;margin:0.15rem 0">{_esc(d)}</li>'
-            h += '</ul>'
-
-        # Code snippet
         snippet = s.get("code_snippet", "")
-        if snippet:
-            h += (f'<pre style="background:#0f172a;border-radius:0.5rem;padding:0.6rem 0.8rem;'
-                  f'margin-top:0.5rem;overflow-x:auto;font-size:0.78rem;color:#94a3b8">'
-                  f'<code>{_esc(snippet)}</code></pre>')
+        if details or snippet:
+            h += ('<details class="step-expand" style="margin-top:0.4rem">'
+                  '<summary style="cursor:pointer;color:#6b7280;font-size:0.75rem;'
+                  'user-select:none;list-style:none;display:flex;align-items:center;gap:0.3rem">'
+                  '<i class="fa-solid fa-plus expand-icon" style="font-size:0.6rem;transition:transform 0.15s"></i>'
+                  ' details</summary>')
+            if details:
+                h += '<ul style="margin:0.4rem 0 0 1rem;padding:0;list-style:disc">'
+                for d in details:
+                    h += f'<li style="color:#9ca3af;font-size:0.8rem;margin:0.15rem 0">{_esc(d)}</li>'
+                h += '</ul>'
+            if snippet:
+                h += ('<pre style="background:#0f172a;border-radius:0.5rem;padding:0.6rem 0.8rem;'
+                      'margin-top:0.5rem;overflow-x:auto;font-size:0.78rem;color:#94a3b8">'
+                      f'<code>{_esc(snippet)}</code></pre>')
+            h += '</details>'
 
         # Decision branches
         branches = s.get("branches")
