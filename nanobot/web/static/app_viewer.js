@@ -135,24 +135,43 @@
     }
 
     // ---------------------------------------------------------------------------
-    // Resolve template: replace {{state.varName}} with actual values
+    // Resolve template: replace {{expression}} with evaluated values
     // ---------------------------------------------------------------------------
 
     function resolveTemplate(template) {
         if (!template) return template;
-        return String(template).replace(/\{\{state\.(\w+)\}\}/g, function (_, name) {
-            var v = state[name];
-            if (v == null) return "";
-            if (typeof v === "object") return JSON.stringify(v);
-            return String(v);
+        return String(template).replace(/\{\{(.+?)\}\}/g, function (match, expr) {
+            try {
+                // Create a function that evaluates the expression with state in scope
+                var fn = new Function('state', 'return (' + expr + ')');
+                var result = fn(state);
+                if (result == null) return "";
+                if (typeof result === "object") return JSON.stringify(result);
+                return String(result);
+            } catch (e) {
+                console.warn("Template evaluation error:", expr, e);
+                return match; // Return original if evaluation fails
+            }
         });
     }
 
     function extractStateVars(template) {
         if (!template) return [];
-        var matches = String(template).match(/\{\{state\.(\w+)\}\}/g);
+        var vars = [];
+        var matches = String(template).match(/\{\{(.+?)\}\}/g);
         if (!matches) return [];
-        return matches.map(function(m) { return m.match(/\{\{state\.(\w+)\}\}/)[1]; });
+        matches.forEach(function(m) {
+            // Extract state.varName references from the expression
+            var expr = m.match(/\{\{(.+?)\}\}/)[1];
+            var stateRefs = expr.match(/state\.(\w+)/g);
+            if (stateRefs) {
+                stateRefs.forEach(function(ref) {
+                    var varName = ref.replace('state.', '');
+                    if (vars.indexOf(varName) === -1) vars.push(varName);
+                });
+            }
+        });
+        return vars;
     }
 
     // ---------------------------------------------------------------------------
