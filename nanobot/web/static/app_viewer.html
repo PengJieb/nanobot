@@ -170,6 +170,19 @@
     <!-- App canvas -->
     <div id="app-canvas" class="hidden flex-1 overflow-y-auto p-8">
         <div id="app-root" class="max-w-5xl mx-auto app-grid"></div>
+
+        <!-- Feedback section -->
+        <div class="max-w-5xl mx-auto mt-8 pt-6 border-t border-gray-700">
+            <h3 class="text-sm font-semibold text-gray-300 mb-3">Improve this app</h3>
+            <div class="flex gap-3">
+                <input id="feedback-input" type="text" placeholder="Describe what you'd like to change or improve..."
+                    class="flex-1 bg-gray-700 text-gray-100 rounded-lg px-4 py-2.5 outline-none focus:ring-2 focus:ring-blue-500 placeholder-gray-400">
+                <button id="feedback-btn" class="bg-blue-600 hover:bg-blue-500 text-white px-5 py-2.5 rounded-lg font-medium transition disabled:opacity-40">
+                    Regenerate
+                </button>
+            </div>
+            <p class="text-xs text-gray-500 mt-2">The AI will update the app based on your feedback</p>
+        </div>
     </div>
 
     <script src="/app_viewer.js"></script>

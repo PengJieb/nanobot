@@ -135,16 +135,24 @@
     }
 
     // ---------------------------------------------------------------------------
-    // Resolve agent_prompt template: replace {{state.varName}} with actual values
+    // Resolve template: replace {{state.varName}} with actual values
     // ---------------------------------------------------------------------------
 
-    function resolvePrompt(template) {
-        return template.replace(/\{\{state\.(\w+)\}\}/g, function (_, name) {
+    function resolveTemplate(template) {
+        if (!template) return template;
+        return String(template).replace(/\{\{state\.(\w+)\}\}/g, function (_, name) {
             var v = state[name];
             if (v == null) return "";
             if (typeof v === "object") return JSON.stringify(v);
             return String(v);
         });
+    }
+
+    function extractStateVars(template) {
+        if (!template) return [];
+        var matches = String(template).match(/\{\{state\.(\w+)\}\}/g);
+        if (!matches) return [];
+        return matches.map(function(m) { return m.match(/\{\{state\.(\w+)\}\}/)[1]; });
     }
 
     // ---------------------------------------------------------------------------
@@ -172,7 +180,7 @@
                         console.warn("Local handler error:", e);
                     }
                 } else if (ev.type === "agent" && ev.agent_prompt) {
-                    var prompt = resolvePrompt(ev.agent_prompt);
+                    var prompt = resolveTemplate(ev.agent_prompt);
                     // Find result display element (bound to result_bind)
                     var resultEl = ev.result_bind ? document.querySelector(
                         '[data-state-bind="' + ev.result_bind + '"][data-result-display]') : null;
@@ -209,7 +217,11 @@
                 inner.className = level === 1 ? "text-2xl font-bold text-gray-100" :
                                    level === 2 ? "text-xl font-bold text-gray-200" :
                                    "text-lg font-semibold text-gray-200";
-                inner.textContent = comp.properties.text || comp.label || "";
+                var text = comp.properties.text || comp.label || "";
+                inner.textContent = resolveTemplate(text);
+                extractStateVars(text).forEach(function(varName) {
+                    registerBinding(varName, function() { inner.textContent = resolveTemplate(text); });
+                });
                 break;
             }
 
@@ -234,11 +246,21 @@
                         try { inner.innerHTML = marked.parse(String(initVal)); }
                         catch (e) { inner.textContent = String(initVal); }
                     } else {
-                        inner.textContent = comp.properties.content || "";
+                        var content = resolveTemplate(comp.properties.content || "");
+                        try { inner.innerHTML = marked.parse(content); }
+                        catch (e) { inner.textContent = content; }
                     }
                 } else {
-                    try { inner.innerHTML = marked.parse(comp.properties.content || comp.label || ""); }
-                    catch (e) { inner.textContent = comp.properties.content || comp.label || ""; }
+                    var content = resolveTemplate(comp.properties.content || comp.label || "");
+                    try { inner.innerHTML = marked.parse(content); }
+                    catch (e) { inner.textContent = content; }
+                    extractStateVars(comp.properties.content || comp.label || "").forEach(function(varName) {
+                        registerBinding(varName, function() {
+                            var updated = resolveTemplate(comp.properties.content || comp.label || "");
+                            try { inner.innerHTML = marked.parse(updated); }
+                            catch (e) { inner.textContent = updated; }
+                        });
+                    });
                 }
                 break;
             }
@@ -503,12 +525,20 @@
                 if (comp.properties.title) {
                     var h = document.createElement("div");
                     h.className = "font-semibold text-gray-100 mb-1";
-                    h.textContent = comp.properties.title;
+                    var title = comp.properties.title;
+                    h.textContent = resolveTemplate(title);
+                    extractStateVars(title).forEach(function(varName) {
+                        registerBinding(varName, function() { h.textContent = resolveTemplate(title); });
+                    });
                     inner.appendChild(h);
                 }
                 var body = document.createElement("div");
                 body.className = "text-sm text-gray-400";
-                body.textContent = comp.properties.body || comp.label || "";
+                var bodyText = comp.properties.body || comp.label || "";
+                body.textContent = resolveTemplate(bodyText);
+                extractStateVars(bodyText).forEach(function(varName) {
+                    registerBinding(varName, function() { body.textContent = resolveTemplate(bodyText); });
+                });
                 inner.appendChild(body);
                 wireEvents(inner, comp.events, comp);
                 break;
@@ -609,6 +639,42 @@
         logoutBtn.addEventListener("click", function () {
             localStorage.removeItem("nanobot_token");
             window.location.href = "/login.html";
+        });
+    }
+
+    // Feedback handler
+    var feedbackBtn = document.getElementById("feedback-btn");
+    var feedbackInput = document.getElementById("feedback-input");
+
+    if (feedbackBtn && feedbackInput) {
+        feedbackBtn.addEventListener("click", async function() {
+            var feedback = feedbackInput.value.trim();
+            if (!feedback) return;
+
+            feedbackBtn.disabled = true;
+            feedbackBtn.textContent = "Regenerating...";
+
+            try {
+                var resp = await fetch("/api/app/" + appId + "/improve", {
+                    method: "POST",
+                    headers: authHeaders({"Content-Type": "application/json"}),
+                    body: JSON.stringify({feedback: feedback})
+                });
+
+                if (handleUnauthorized(resp)) return;
+
+                if (resp.ok) {
+                    feedbackInput.value = "";
+                    await loadApp();
+                } else {
+                    alert("Failed to regenerate app");
+                }
+            } catch (err) {
+                alert("Error: " + err.message);
+            } finally {
+                feedbackBtn.disabled = false;
+                feedbackBtn.textContent = "Regenerate";
+            }
         });
     }
 

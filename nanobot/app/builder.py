@@ -182,9 +182,39 @@ class AppBuilder:
         )
 
         spec = _parse_spec(raw or "", app_manager.new_id())
+        spec.requirements = requirements
         app_manager.save(spec)
         cls.discard_session(session.session_id)
         return spec
+
+    @classmethod
+    async def regenerate(
+        cls,
+        app_id: str,
+        feedback: str,
+        agent: AgentLoop,
+        app_manager: AppManager,
+    ) -> AppSpec:
+        """Regenerate an app based on user feedback."""
+        spec = app_manager.get(app_id)
+        if spec is None:
+            raise ValueError("App not found")
+
+        prompt = _GENERATION_PROMPT.format(
+            requirements=f"{spec.requirements}\n\n## User Feedback\n\n{feedback}"
+        )
+
+        raw = await agent.process_direct(
+            prompt,
+            session_key=f"app:improve:{app_id}",
+            channel="web",
+            chat_id="app-builder",
+        )
+
+        new_spec = _parse_spec(raw or "", app_id)
+        new_spec.requirements = spec.requirements
+        app_manager.save(new_spec)
+        return new_spec
 
 
 # ---------------------------------------------------------------------------

@@ -181,14 +181,6 @@ def create_app(
         if not message:
             raise HTTPException(status_code=400, detail="message is required")
 
-        # Check for app construct command first
-        lower_msg = message.lower()
-        if lower_msg == "#app" or lower_msg.startswith("#app "):
-            raise HTTPException(
-                status_code=400,
-                detail="Please use the App Builder interface to create applications"
-            )
-
         queue: asyncio.Queue[dict] = asyncio.Queue()
 
         async def on_progress(content: str, *, tool_hint: bool = False) -> None:
@@ -434,6 +426,20 @@ def create_app(
             if not app_manager.delete(app_id):
                 raise HTTPException(status_code=404, detail="app not found")
             return {"status": "deleted"}
+
+        @app.post("/api/app/{app_id}/improve")
+        async def improve_app(app_id: str, request: Request):
+            """Regenerate app based on user feedback."""
+            body = await request.json()
+            feedback = (body.get("feedback") or "").strip()
+            if not feedback:
+                raise HTTPException(status_code=400, detail="feedback is required")
+
+            try:
+                spec = await AppBuilder.regenerate(app_id, feedback, agent, app_manager)
+                return {"status": "success", "app_id": spec.id}
+            except ValueError as e:
+                raise HTTPException(status_code=404, detail=str(e))
 
         @app.post("/api/app/{app_id}/action")
         async def app_action(app_id: str, request: Request):
