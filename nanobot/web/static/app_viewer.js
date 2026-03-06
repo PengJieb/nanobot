@@ -53,9 +53,10 @@
 
     function setState(name, value) {
         state[name] = value;
+        console.log("setState called:", name, "=", value, "bindings:", stateBindings[name] ? stateBindings[name].length : 0);
         // Update all components bound to this variable
         if (stateBindings[name]) {
-            stateBindings[name].forEach(function (fn) { try { fn(value); } catch (e) {} });
+            stateBindings[name].forEach(function (fn) { try { fn(value); } catch (e) { console.error("Binding error:", e); } });
         }
     }
 
@@ -180,6 +181,7 @@
 
     function wireEvents(el, events, comp) {
         if (!events) return;
+        console.log("wireEvents called for component:", comp.id, "events:", Object.keys(events));
         Object.keys(events).forEach(function (evName) {
             var ev = events[evName];
             if (!ev) return;
@@ -188,6 +190,7 @@
                            evName === "submit" ? "submit" : evName;
 
             el.addEventListener(domEvent, function (domEv) {
+                console.log("Event fired:", evName, "on component:", comp.id, "event type:", ev.type);
                 if (ev.type === "local" && ev.local_code) {
                     try {
                         // Provide helpers: state, setState, getState, event, value
@@ -199,10 +202,13 @@
                         console.warn("Local handler error:", e);
                     }
                 } else if (ev.type === "agent" && ev.agent_prompt) {
+                    console.log("Agent event - prompt template:", ev.agent_prompt, "result_bind:", ev.result_bind);
                     var prompt = resolveTemplate(ev.agent_prompt);
-                    // Find result display element (bound to result_bind)
+                    console.log("Resolved prompt:", prompt);
+                    // Query for result display element dynamically at click time
                     var resultEl = ev.result_bind ? document.querySelector(
                         '[data-state-bind="' + ev.result_bind + '"][data-result-display]') : null;
+                    console.log("Result element found:", resultEl);
                     callAgent(prompt, ev.result_bind, resultEl);
                 }
             });
