@@ -15,6 +15,9 @@ if TYPE_CHECKING:
 
 
 _GENERATION_PROMPT = """\
+CRITICAL: Your response must be PURE JSON ONLY. Do not include markdown code blocks, \
+explanations, or any text before or after the JSON object. Start with {{ and end with }}.
+
 You are an expert UI/UX designer and frontend developer.
 Based on the user's application requirements below, generate a complete JSON specification \
 for an interactive web application.
@@ -25,7 +28,7 @@ for an interactive web application.
 
 ## Output Format
 
-Respond with ONLY valid JSON — no markdown fences, no extra text.
+Output ONLY the JSON object below. NO markdown fences (```), NO explanatory text.
 Use this exact structure:
 
 {{

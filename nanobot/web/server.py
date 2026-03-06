@@ -155,12 +155,13 @@ def create_app(
             raise HTTPException(status_code=400, detail="username and password required")
 
         if auth is None:
-            return {"token": "no-auth", "username": username}
+            return {"token": "no-auth", "username": username, "role": "admin"}
 
         token = auth.login(username, password)
         if token is None:
             raise HTTPException(status_code=401, detail="invalid username or password")
-        return {"token": token, "username": username}
+        role = auth.get_user_role(token) or "normal"
+        return {"token": token, "username": username, "role": role}
 
     # ------------------------------------------------------------------
     # Chat endpoints
@@ -219,10 +220,15 @@ def create_app(
     # ------------------------------------------------------------------
 
     @app.get("/api/skills")
-    async def list_skills():
+    async def list_skills(request: Request):
+        token = request.headers.get("Authorization", "").removeprefix("Bearer ").strip()
+        user_role = auth.get_user_role(token) if auth else "admin"
+
         all_skills = skills_loader.list_skills(filter_unavailable=False)
         result = []
         for s in all_skills:
+            if user_role == "normal" and s["source"] == "builtin":
+                continue
             meta = skills_loader.get_skill_metadata(s["name"]) or {}
             skill_meta = skills_loader._parse_nanobot_metadata(meta.get("metadata", ""))
             available = skills_loader._check_requirements(skill_meta)
@@ -310,6 +316,26 @@ def create_app(
         logic_path.write_text(result or "", encoding="utf-8")
 
         return {"logic": result or ""}
+
+    @app.delete("/api/skills/{name}")
+    async def delete_skill(name: str, request: Request):
+        import shutil
+        token = request.headers.get("Authorization", "").removeprefix("Bearer ").strip()
+        user_role = auth.get_user_role(token) if auth else "admin"
+
+        skill_dir = _find_skill_dir(skills_loader, name)
+        if skill_dir is None:
+            raise HTTPException(status_code=404, detail="skill not found")
+
+        source = _get_skill_source(skills_loader, name)
+        if source == "builtin" and user_role != "admin":
+            raise HTTPException(status_code=403, detail="only admin can delete builtin skills")
+
+        try:
+            shutil.rmtree(skill_dir)
+            return {"status": "deleted"}
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"failed to delete: {str(e)}")
 
     # ------------------------------------------------------------------
     # Application builder endpoints

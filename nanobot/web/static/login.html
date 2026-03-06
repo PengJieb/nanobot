@@ -111,6 +111,7 @@
                 var data = await resp.json();
                 localStorage.setItem("nanobot_token", data.token);
                 localStorage.setItem("nanobot_user", data.username);
+                localStorage.setItem("nanobot_role", data.role || "normal");
                 window.location.href = "/";
             } catch (err) {
                 errEl.textContent = "Connection error";
@@ -143,6 +144,7 @@
                 var data = await resp.json();
                 localStorage.setItem("nanobot_token", data.token);
                 localStorage.setItem("nanobot_user", data.username);
+                localStorage.setItem("nanobot_role", data.role || "normal");
                 window.location.href = "/";
             } catch (err) {
                 errEl.textContent = "Connection error";

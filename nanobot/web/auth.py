@@ -37,7 +37,8 @@ class AuthManager:
         salt = secrets.token_hex(16)
         pw_hash = self._hash(password, salt)
         token = secrets.token_hex(32)
-        self._users[username] = {"password_hash": pw_hash, "salt": salt, "token": token}
+        role = "admin" if not self._users else "normal"
+        self._users[username] = {"password_hash": pw_hash, "salt": salt, "token": token, "role": role}
         self._save()
         return token
 
@@ -61,6 +62,15 @@ class AuthManager:
         for username, data in self._users.items():
             if data.get("token") == token:
                 return username
+        return None
+
+    def get_user_role(self, token: str) -> str | None:
+        """Return the role for a valid token, or None."""
+        if not token:
+            return None
+        for username, data in self._users.items():
+            if data.get("token") == token:
+                return data.get("role", "normal")
         return None
 
     # ------------------------------------------------------------------

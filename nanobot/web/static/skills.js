@@ -16,6 +16,7 @@
 
     var allSkills = [];
     var activeCard = null;
+    var userRole = localStorage.getItem("nanobot_role") || "normal";
 
     // Color themes for pipeline sections
     var COLORS = {
@@ -117,7 +118,7 @@
 
             var pipeline = tryParseJSON(data.logic);
 
-            var html = _headerBar(!!data.logic);
+            var html = _headerBar(!!data.logic, data.name, data.source);
 
             if (pipeline && pipeline.entry_point) {
                 html += renderPipeline(pipeline);
@@ -223,9 +224,14 @@
 
     // -- Header bar with generate/regenerate button ---------------------
 
-    function _headerBar(hasLogic) {
+    function _headerBar(hasLogic, skillName, skillSource) {
         var h = '<div class="flex items-center justify-between mb-5 pb-4 border-b border-gray-700">';
         h += '<h2 class="text-lg font-bold text-gray-100">Logic Pipeline</h2>';
+        h += '<div class="flex gap-2">';
+        if (skillSource === "workspace" || userRole === "admin") {
+            h += '<button id="delete-skill-btn" class="flex items-center gap-1.5 text-sm font-medium px-3 py-1.5 rounded-md transition bg-red-600 hover:bg-red-500 text-white" title="Delete skill">';
+            h += '<i class="fa-solid fa-trash"></i> Delete</button>';
+        }
         h += '<button id="gen-logic-btn" class="flex items-center gap-1.5 text-sm font-medium px-3 py-1.5 rounded-md transition ';
         if (hasLogic) {
             h += 'bg-gray-700 hover:bg-gray-600 text-gray-300 hover:text-white" title="Regenerate pipeline">';
@@ -234,7 +240,7 @@
             h += 'bg-blue-600 hover:bg-blue-500 text-white" title="Generate pipeline">';
             h += '<i class="fa-solid fa-wand-magic-sparkles"></i> Generate Pipeline';
         }
-        h += '</button></div>';
+        h += '</button></div></div>';
         return h;
     }
 
@@ -249,6 +255,8 @@
     function _bindBtn(name) {
         var btn = document.getElementById("gen-logic-btn");
         if (btn) btn.addEventListener("click", function () { generateLogic(name); });
+        var delBtn = document.getElementById("delete-skill-btn");
+        if (delBtn) delBtn.addEventListener("click", function () { deleteSkill(name); });
     }
 
     // -- Generate / refresh logic pipeline ------------------------------
@@ -273,10 +281,38 @@
             }
             await loadDetail(name);
         } catch (err) {
-            detailContent.innerHTML = _headerBar(false)
+            var skill = allSkills.find(function(s) { return s.name === name; });
+            var source = skill ? skill.source : "workspace";
+            detailContent.innerHTML = _headerBar(false, name, source)
                 + '<div class="text-center py-12"><p class="text-red-400 mb-4">Pipeline generation failed: '
                 + esc(err.message) + '</p></div>';
             _bindBtn(name);
+        }
+    }
+
+    // -- Delete skill ---------------------------------------------------
+
+    async function deleteSkill(name) {
+        if (!confirm("Are you sure you want to delete the skill '" + name + "'? This cannot be undone.")) {
+            return;
+        }
+
+        try {
+            var resp = await fetch("/api/skills/" + encodeURIComponent(name), {
+                method: "DELETE", headers: authHeaders(),
+            });
+            if (handleUnauthorized(resp)) return;
+            if (!resp.ok) {
+                var data = await resp.json();
+                throw new Error(data.detail || "Delete failed");
+            }
+
+            detailPanel.classList.add("hidden");
+            detailPanel.classList.remove("flex");
+            detailEmpty.classList.remove("hidden");
+            await init();
+        } catch (err) {
+            alert("Failed to delete skill: " + err.message);
         }
     }
 

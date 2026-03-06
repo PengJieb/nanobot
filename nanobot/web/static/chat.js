@@ -150,7 +150,8 @@
         if (!text || busy) return;
 
         // #app trigger — redirect to the application builder
-        if (text.toLowerCase().startsWith("#app")) {
+        var lowerText = text.toLowerCase();
+        if (lowerText === "#app" || lowerText.startsWith("#app ")) {
             window.location.href = "/app_builder.html";
             return;
         }
