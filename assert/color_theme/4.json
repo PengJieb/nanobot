@@ -1,0 +1,25 @@
+{
+  "name": "Enchanted Forest",
+  "description": "Deep emerald greens with light teal and warm amber tones, inspired by magical nature",
+  "colors": [
+    {"hex": "#055912", "name": "deep-green",   "role": "darkest background / strong accent"},
+    {"hex": "#14826B", "name": "teal-green",   "role": "primary / buttons / key elements"},
+    {"hex": "#A3D1CD", "name": "light-teal",   "role": "soft highlight / tags / accents"},
+    {"hex": "#FADEBC", "name": "cream-peach",  "role": "warm neutral / text on dark / background"},
+    {"hex": "#D99550", "name": "warm-amber",   "role": "warm accent / call-to-action"},
+    {"hex": "#731717", "name": "dark-brown",   "role": "deep shadow / border"}
+  ],
+  "suggested_theme_colors": {
+    "--app-primary":      "#14826B",
+    "--app-primary-hover":"#0A6153",
+    "--app-surface":      "#0C3A1A",
+    "--app-border":       "#1A5C2E",
+    "--app-text":         "#FADEBC",
+    "--app-heading":      "#A3D1CD",
+    "--app-text-muted":   "#7ABFB8",
+    "--app-input-bg":     "#082812",
+    "--app-result-bg":    "#04180A",
+    "--app-accent":       "#D99550"
+  },
+  "card_colors": ["teal", "teal", "amber", "rose", "blue"]
+}

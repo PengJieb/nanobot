@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import json
+import random
 import re
 import uuid
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 from nanobot.app.schema import AppComponent, AppLayout, AppSpec, AppState, BuildSession, StateVariable
@@ -13,6 +15,38 @@ from nanobot.app.manager import AppManager
 if TYPE_CHECKING:
     from nanobot.agent.loop import AgentLoop
 
+# Directory holding color theme JSON files alongside the JPEG palette images
+_COLOR_THEME_DIR = Path(__file__).parents[2] / "assert" / "color_theme"
+
+
+_COLOR_SECTION = """\
+
+## Color Theme
+
+Apply the following color palette to give the app a distinctive visual identity.
+Palette name: **{palette_name}** — {palette_desc}
+
+Colors:
+{color_list}
+
+Instructions:
+- Use these colors for card `color` values (map to nearest: blue/purple/teal/rose/amber)
+- Populate the `theme_colors` object in your JSON output with CSS custom properties using \
+exact hex values from the palette. Choose the best mapping:
+  - `--app-primary`       → button backgrounds and primary accent
+  - `--app-primary-hover` → slightly darker hover state for buttons
+  - `--app-surface`       → card / panel background color
+  - `--app-border`        → border color
+  - `--app-text`          → main body text color
+  - `--app-heading`       → heading / title text color
+  - `--app-text-muted`    → muted label / subtitle text
+  - `--app-input-bg`      → input / textarea background
+  - `--app-result-bg`     → result box / output area background
+  - `--app-accent`        → secondary accent color
+- Set `"color": "{palette_name}"` in the output JSON
+- Use the darkest palette colors for backgrounds, mid-tones for surfaces/borders, \
+brightest colors for headings and key numbers
+"""
 
 _GENERATION_PROMPT = """\
 CRITICAL: Your response must be PURE JSON ONLY. Do not include markdown code blocks, \
@@ -24,7 +58,7 @@ for an interactive web application.
 
 ## User Requirements
 
-{requirements}
+{requirements}{color_section}
 
 ## Output Format
 
@@ -34,6 +68,8 @@ Use this exact structure:
 {{
   "title": "Application title",
   "description": "What this application does in one sentence",
+  "color": "",
+  "theme_colors": {{}},
   "layout": {{
     "type": "single-page",
     "theme": "dark"
@@ -175,7 +211,8 @@ class AppBuilder:
     ) -> AppSpec:
         """Ask the agent to produce an AppSpec from the completed Q&A."""
         requirements = session.build_requirements_text()
-        prompt = _GENERATION_PROMPT.format(requirements=requirements)
+        color_section = _build_color_section()
+        prompt = _GENERATION_PROMPT.format(requirements=requirements, color_section=color_section)
 
         raw = await agent.process_direct(
             prompt,
@@ -203,8 +240,10 @@ class AppBuilder:
         if spec is None:
             raise ValueError("App not found")
 
+        color_section = _build_color_section()
         prompt = _GENERATION_PROMPT.format(
-            requirements=f"{spec.requirements}\n\n## User Feedback\n\n{feedback}"
+            requirements=f"{spec.requirements}\n\n## User Feedback\n\n{feedback}",
+            color_section=color_section,
         )
 
         raw = await agent.process_direct(
@@ -218,6 +257,41 @@ class AppBuilder:
         new_spec.requirements = spec.requirements
         app_manager.save(new_spec)
         return new_spec
+
+
+# ---------------------------------------------------------------------------
+# Color theme helpers
+# ---------------------------------------------------------------------------
+
+
+def _pick_random_palette() -> dict | None:
+    """Return a random color palette dict from assert/color_theme/*.json, or None."""
+    if not _COLOR_THEME_DIR.is_dir():
+        return None
+    palette_files = list(_COLOR_THEME_DIR.glob("*.json"))
+    if not palette_files:
+        return None
+    chosen = random.choice(palette_files)
+    try:
+        return json.loads(chosen.read_text(encoding="utf-8"))
+    except Exception:
+        return None
+
+
+def _build_color_section() -> str:
+    """Build the color section string to inject into the generation prompt."""
+    palette = _pick_random_palette()
+    if not palette:
+        return ""
+    color_list = "\n".join(
+        f"  - {c['hex']} ({c['name']}): {c['role']}"
+        for c in palette.get("colors", [])
+    )
+    return _COLOR_SECTION.format(
+        palette_name=palette.get("name", "Custom Palette"),
+        palette_desc=palette.get("description", ""),
+        color_list=color_list,
+    )
 
 
 # ---------------------------------------------------------------------------

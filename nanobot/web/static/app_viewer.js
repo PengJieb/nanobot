@@ -259,9 +259,9 @@
             case "heading": {
                 var level = (comp.properties.level || 1);
                 inner = document.createElement("h" + level);
-                inner.className = level === 1 ? "text-2xl font-bold text-gray-100" :
-                                   level === 2 ? "text-xl font-bold text-gray-200" :
-                                   "text-lg font-semibold text-gray-200";
+                inner.className = level === 1 ? "text-2xl font-bold app-comp-heading" :
+                                   level === 2 ? "text-xl font-bold app-comp-heading" :
+                                   "text-lg font-semibold app-comp-heading";
                 var text = comp.properties.text || comp.label || "";
                 inner.textContent = resolveTemplate(text);
                 extractStateVars(text).forEach(function(varName) {
@@ -722,6 +722,24 @@
             } else {
                 document.body.classList.remove("app-theme-light", "text-gray-900");
                 document.body.classList.add("bg-gray-900", "text-gray-100");
+            }
+
+            // Apply custom theme_colors as CSS variables on #app-canvas
+            var canvas = document.getElementById("app-canvas");
+            if (spec.theme_colors && typeof spec.theme_colors === "object") {
+                Object.keys(spec.theme_colors).forEach(function(key) {
+                    canvas.style.setProperty(key, String(spec.theme_colors[key]));
+                });
+            }
+
+            // Show color palette badge if spec has a named palette
+            if (spec.color) {
+                var badge = document.getElementById("app-color-badge");
+                var colorNameEl = document.getElementById("app-color-name");
+                if (badge && colorNameEl) {
+                    colorNameEl.textContent = spec.color;
+                    badge.classList.remove("hidden");
+                }
             }
 
             // Initialize state from spec (preserve existing values)

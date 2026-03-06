@@ -1,0 +1,24 @@
+{
+  "name": "Rainy Sky",
+  "description": "Deep ocean blues with sandy beige and muted sage, inspired by rainy days",
+  "colors": [
+    {"hex": "#2B4F7D", "name": "deep-blue",    "role": "dark background / primary dark"},
+    {"hex": "#3B77B0", "name": "medium-blue",  "role": "primary / buttons / links"},
+    {"hex": "#7BC5E3", "name": "light-blue",   "role": "accent / highlights / tags"},
+    {"hex": "#EEE096", "name": "sand",         "role": "warm accent / stat numbers"},
+    {"hex": "#637851", "name": "sage",         "role": "secondary accent / subtle elements"}
+  ],
+  "suggested_theme_colors": {
+    "--app-primary":      "#3B77B0",
+    "--app-primary-hover":"#2B5E94",
+    "--app-surface":      "#1F3A5F",
+    "--app-border":       "#2B4F7D",
+    "--app-text":         "#D4E8F5",
+    "--app-heading":      "#7BC5E3",
+    "--app-text-muted":   "#7BC5E3",
+    "--app-input-bg":     "#162D4A",
+    "--app-result-bg":    "#0E1E33",
+    "--app-accent":       "#EEE096"
+  },
+  "card_colors": ["blue", "teal", "amber", "blue", "teal"]
+}

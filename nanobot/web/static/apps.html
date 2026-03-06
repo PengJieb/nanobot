@@ -8,6 +8,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <link rel="stylesheet" href="/style.css">
     <script>
+        (function() { if (localStorage.getItem('nanobot_theme') === 'light') document.documentElement.classList.add('theme-light'); })();
         tailwind.config = { darkMode: 'class', theme: { extend: {} } }
     </script>
 </head>
@@ -25,6 +26,10 @@
                class="text-sm bg-blue-600 hover:bg-blue-500 text-white px-4 py-1.5 rounded-md transition font-medium">
                 + New App
             </a>
+            <button id="theme-toggle" class="text-sm text-gray-400 hover:text-gray-200 px-2 py-1.5 transition" title="Toggle theme">
+                <i class="fa-solid fa-sun" id="theme-sun" style="display:none"></i>
+                <i class="fa-solid fa-moon" id="theme-moon"></i>
+            </button>
             <button id="logout-btn" class="text-sm text-gray-400 hover:text-gray-200 px-2 py-1.5 transition">
                 Logout
             </button>
@@ -62,5 +67,25 @@
     </div>
 
     <script src="/apps.js"></script>
+    <script>
+        (function() {
+            var html = document.documentElement;
+            var sunEl = document.getElementById('theme-sun');
+            var moonEl = document.getElementById('theme-moon');
+            function updateIcons() {
+                var light = html.classList.contains('theme-light');
+                sunEl.style.display  = light ? '' : 'none';
+                moonEl.style.display = light ? 'none' : '';
+            }
+            updateIcons();
+            document.getElementById('theme-toggle').addEventListener('click', function() {
+                var light = html.classList.contains('theme-light');
+                html.classList.toggle('theme-light', !light);
+                localStorage.setItem('nanobot_theme', light ? 'dark' : 'light');
+                updateIcons();
+            });
+        })();
+    </script>
 </body>
 </html>
+

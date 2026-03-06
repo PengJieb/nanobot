@@ -141,3 +141,116 @@
     max-height: 200px;
     overflow-y: auto;
 }
+
+/* =====================================================================
+   LIGHT THEME — global nav/layout overrides
+   Applied when <html> has class="theme-light"
+   ===================================================================== */
+
+html.theme-light body {
+    background-color: #f9fafb;
+    color: #111827;
+}
+
+/* Nav bar */
+html.theme-light nav {
+    background-color: #ffffff !important;
+    border-bottom-color: #e5e7eb !important;
+}
+html.theme-light nav .text-xl { color: #111827; }
+html.theme-light nav a { color: #6b7280; }
+html.theme-light nav a:hover { color: #111827; }
+html.theme-light nav a.text-blue-400 { color: #2563eb !important; }
+html.theme-light nav .text-gray-400 { color: #6b7280; }
+html.theme-light nav .text-gray-400:hover { color: #111827; }
+html.theme-light nav button.text-gray-400 { color: #6b7280; }
+html.theme-light nav button.text-gray-400:hover { color: #111827; }
+
+/* Chat page */
+html.theme-light #messages {
+    background-color: #f9fafb;
+}
+html.theme-light .bg-gray-800.px-4.py-3 {
+    background-color: #ffffff !important;
+    border-top-color: #e5e7eb !important;
+}
+html.theme-light #input {
+    background-color: #ffffff;
+    color: #111827;
+    border: 1px solid #d1d5db;
+}
+html.theme-light #input::placeholder { color: #9ca3af; }
+html.theme-light #new-chat-btn {
+    background-color: #f3f4f6;
+    color: #374151;
+}
+html.theme-light #new-chat-btn:hover { background-color: #e5e7eb; }
+
+/* Chat message bubbles */
+html.theme-light .bg-gray-700 { background-color: #f3f4f6 !important; }
+html.theme-light .bg-gray-800 { background-color: #ffffff !important; }
+html.theme-light .border-gray-700 { border-color: #e5e7eb !important; }
+html.theme-light .text-gray-100 { color: #111827 !important; }
+html.theme-light .text-gray-200 { color: #1f2937 !important; }
+html.theme-light .text-gray-300 { color: #374151 !important; }
+html.theme-light .text-gray-400 { color: #6b7280 !important; }
+html.theme-light .text-gray-500 { color: #9ca3af !important; }
+html.theme-light .bg-gray-900 { background-color: #f9fafb !important; }
+html.theme-light code { background: rgba(0,0,0,0.06); }
+
+/* Skills page */
+html.theme-light #search {
+    background-color: #ffffff;
+    color: #111827;
+    border: 1px solid #d1d5db;
+}
+html.theme-light #search::placeholder { color: #9ca3af; }
+html.theme-light .skill-card:hover { background-color: rgba(0,0,0,0.04); }
+html.theme-light .skill-card.active {
+    background-color: rgba(37,99,235,0.08);
+    border-color: #2563eb;
+}
+html.theme-light .prose-invert h1,
+html.theme-light .prose-invert h2,
+html.theme-light .prose-invert h3 { color: #111827; }
+html.theme-light .prose-invert p  { color: #374151; }
+html.theme-light .prose-invert ul,
+html.theme-light .prose-invert ol { color: #374151; }
+html.theme-light .prose-invert code { background: rgba(0,0,0,0.06); }
+html.theme-light .prose-invert pre { background: #f3f4f6; }
+
+/* Apps page cards */
+html.theme-light #app-grid > div {
+    background-color: #ffffff !important;
+    border-color: #e5e7eb !important;
+}
+html.theme-light #app-grid > div h3 { color: #111827; }
+
+/* App builder page */
+html.theme-light #answer-input {
+    background-color: #ffffff;
+    color: #111827;
+    border: 1px solid #d1d5db;
+}
+html.theme-light #answer-input::placeholder { color: #9ca3af; }
+html.theme-light .bg-gray-700.rounded-full { background-color: #e5e7eb !important; }
+
+/* App viewer — light overrides for nav + titlebar */
+html.theme-light #app-titlebar {
+    background-color: rgba(255,255,255,0.9) !important;
+    border-bottom-color: #e5e7eb !important;
+    color: #111827;
+}
+html.theme-light #app-titlebar #app-desc { color: #6b7280; }
+html.theme-light #feedback-input {
+    background-color: #ffffff;
+    color: #111827;
+    border: 1px solid #d1d5db;
+}
+html.theme-light #feedback-input::placeholder { color: #9ca3af; }
+html.theme-light .border-t.border-gray-700.mt-8.pt-6 {
+    border-top-color: #e5e7eb !important;
+}
+html.theme-light h3.text-sm.font-semibold.text-gray-300 { color: #374151 !important; }
+html.theme-light .text-xs.text-gray-500 { color: #9ca3af !important; }
+

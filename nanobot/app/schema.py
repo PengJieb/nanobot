@@ -67,6 +67,8 @@ class AppSpec(BaseModel):
     state: AppState = Field(default_factory=AppState)
     components: list[AppComponent] = Field(default_factory=list)
     requirements: str = ""  # Original Q&A text for regeneration
+    color: str = ""  # Name of the color palette applied (empty = no custom palette)
+    theme_colors: dict[str, Any] = Field(default_factory=dict)  # CSS custom properties
 
     def to_dict(self) -> dict[str, Any]:
         return self.model_dump(mode="json", by_alias=True)

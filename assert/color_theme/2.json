@@ -1,0 +1,24 @@
+{
+  "name": "Urban Green",
+  "description": "Dark slate with sky blue and natural green tones, inspired by city streets and nature",
+  "colors": [
+    {"hex": "#404D5B", "name": "dark-slate",   "role": "dark background / deepest surface"},
+    {"hex": "#5492C7", "name": "sky-blue",     "role": "primary / buttons / links"},
+    {"hex": "#E7E5DF", "name": "light-grey",   "role": "light background / text on dark"},
+    {"hex": "#99B86B", "name": "sage-green",   "role": "secondary accent"},
+    {"hex": "#688A4C", "name": "forest-green", "role": "strong accent / emphasis"}
+  ],
+  "suggested_theme_colors": {
+    "--app-primary":      "#5492C7",
+    "--app-primary-hover":"#3D7BB0",
+    "--app-surface":      "#2E3840",
+    "--app-border":       "#404D5B",
+    "--app-text":         "#E7E5DF",
+    "--app-heading":      "#E7E5DF",
+    "--app-text-muted":   "#99B86B",
+    "--app-input-bg":     "#242D35",
+    "--app-result-bg":    "#1A2228",
+    "--app-accent":       "#99B86B"
+  },
+  "card_colors": ["blue", "teal", "teal", "blue", "amber"]
+}

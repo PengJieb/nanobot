@@ -9,10 +9,8 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <link rel="stylesheet" href="/style.css">
     <script>
-        tailwind.config = {
-            darkMode: 'class',
-            theme: { extend: {} }
-        }
+        (function() { if (localStorage.getItem('nanobot_theme') === 'light') document.documentElement.classList.add('theme-light'); })();
+        tailwind.config = { darkMode: 'class', theme: { extend: {} } }
     </script>
 </head>
 <body class="h-full bg-gray-900 text-gray-100 flex flex-col dark">
@@ -24,9 +22,15 @@
             <a href="/skills.html" class="text-blue-400 font-medium hover:underline">Skills</a>
             <a href="/apps.html" class="text-gray-400 hover:text-gray-200">Apps</a>
         </div>
-        <button id="logout-btn" class="text-sm text-gray-400 hover:text-gray-200 px-2 py-1.5 transition">
-            Logout
-        </button>
+        <div class="flex items-center gap-2">
+            <button id="theme-toggle" class="text-sm text-gray-400 hover:text-gray-200 px-2 py-1.5 transition" title="Toggle theme">
+                <i class="fa-solid fa-sun" id="theme-sun" style="display:none"></i>
+                <i class="fa-solid fa-moon" id="theme-moon"></i>
+            </button>
+            <button id="logout-btn" class="text-sm text-gray-400 hover:text-gray-200 px-2 py-1.5 transition">
+                Logout
+            </button>
+        </div>
     </nav>
 
     <div class="flex-1 flex overflow-hidden">
@@ -56,5 +60,25 @@
     </div>
 
     <script src="/skills.js"></script>
+    <script>
+        (function() {
+            var html = document.documentElement;
+            var sunEl = document.getElementById('theme-sun');
+            var moonEl = document.getElementById('theme-moon');
+            function updateIcons() {
+                var light = html.classList.contains('theme-light');
+                sunEl.style.display  = light ? '' : 'none';
+                moonEl.style.display = light ? 'none' : '';
+            }
+            updateIcons();
+            document.getElementById('theme-toggle').addEventListener('click', function() {
+                var light = html.classList.contains('theme-light');
+                html.classList.toggle('theme-light', !light);
+                localStorage.setItem('nanobot_theme', light ? 'dark' : 'light');
+                updateIcons();
+            });
+        })();
+    </script>
 </body>
 </html>
+

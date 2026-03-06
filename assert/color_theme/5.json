@@ -1,0 +1,24 @@
+{
+  "name": "Heron Blue",
+  "description": "Warm teal blues with cream and salmon, inspired by coastal landscapes",
+  "colors": [
+    {"hex": "#46788E", "name": "teal-blue",    "role": "primary / dark surface / buttons"},
+    {"hex": "#78B7C9", "name": "light-teal",   "role": "secondary / highlight / links"},
+    {"hex": "#F6E093", "name": "cream",        "role": "warm neutral / stat numbers / headings"},
+    {"hex": "#E58B7B", "name": "salmon",       "role": "warm accent / call-to-action"},
+    {"hex": "#97B319", "name": "lime",         "role": "vivid accent / success indicators"}
+  ],
+  "suggested_theme_colors": {
+    "--app-primary":      "#46788E",
+    "--app-primary-hover":"#345F72",
+    "--app-surface":      "#2E5A6E",
+    "--app-border":       "#3A6B7E",
+    "--app-text":         "#F0EDD8",
+    "--app-heading":      "#F6E093",
+    "--app-text-muted":   "#78B7C9",
+    "--app-input-bg":     "#234555",
+    "--app-result-bg":    "#182E3A",
+    "--app-accent":       "#E58B7B"
+  },
+  "card_colors": ["teal", "blue", "amber", "rose", "teal"]
+}

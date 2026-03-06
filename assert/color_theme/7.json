@@ -1,0 +1,27 @@
+{
+  "name": "Hiroshige",
+  "description": "Classic Japanese palette combining warm coral-orange sunsets with deep indigo-steel blues",
+  "colors": [
+    {"hex": "#E76254", "name": "coral",        "role": "warm accent / emphasis / danger"},
+    {"hex": "#EF8A47", "name": "orange",       "role": "warm primary / call-to-action"},
+    {"hex": "#F7AA58", "name": "amber",        "role": "warm secondary / highlights"},
+    {"hex": "#FFD070", "name": "golden",       "role": "bright highlight / stat numbers"},
+    {"hex": "#72BCD5", "name": "sky-blue",     "role": "cool primary / links / accents"},
+    {"hex": "#5267AD", "name": "indigo",       "role": "primary / nav / buttons"},
+    {"hex": "#376795", "name": "steel-blue",   "role": "dark accent / borders"},
+    {"hex": "#1E466E", "name": "navy",         "role": "darkest background / deep surface"}
+  ],
+  "suggested_theme_colors": {
+    "--app-primary":      "#5267AD",
+    "--app-primary-hover":"#3D4E94",
+    "--app-surface":      "#1E3355",
+    "--app-border":       "#2B4A7A",
+    "--app-text":         "#FFE6B7",
+    "--app-heading":      "#FFD070",
+    "--app-text-muted":   "#72BCD5",
+    "--app-input-bg":     "#162640",
+    "--app-result-bg":    "#0E1A2E",
+    "--app-accent":       "#EF8A47"
+  },
+  "card_colors": ["blue", "purple", "amber", "rose", "teal"]
+}

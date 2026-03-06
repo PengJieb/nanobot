@@ -11,9 +11,25 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <link rel="stylesheet" href="/style.css">
     <script>
+        (function() { if (localStorage.getItem('nanobot_theme') === 'light') document.documentElement.classList.add('theme-light'); })();
         tailwind.config = { darkMode: 'class', theme: { extend: {} } }
     </script>
     <style>
+        /* ── CSS Custom Properties (dark defaults, overridden by theme_colors) ── */
+        #app-canvas {
+            --app-primary:       #2563eb;
+            --app-primary-hover: #1d4ed8;
+            --app-surface:       #1f2937;
+            --app-surface-2:     #374151;
+            --app-border:        #4b5563;
+            --app-text:          #f3f4f6;
+            --app-text-muted:    #9ca3af;
+            --app-heading:       #f9fafb;
+            --app-input-bg:      #374151;
+            --app-result-bg:     #111827;
+            --app-accent:        #3b82f6;
+        }
+
         /* 12-column grid layout */
         .app-grid {
             display: grid;
@@ -23,32 +39,32 @@
         }
         .app-cell { min-width: 0; }
 
-        /* Component base styles */
+        /* Component base styles — all use CSS custom properties */
         .app-label {
             font-size: 0.8125rem;
             font-weight: 500;
-            color: #9ca3af;
+            color: var(--app-text-muted, #9ca3af);
             margin-bottom: 0.3rem;
         }
         .app-input {
             width: 100%;
-            background: #374151;
-            color: #f3f4f6;
-            border: 1px solid #4b5563;
+            background: var(--app-input-bg, #374151);
+            color: var(--app-text, #f3f4f6);
+            border: 1px solid var(--app-border, #4b5563);
             border-radius: 0.5rem;
             padding: 0.5rem 0.75rem;
             font-size: 0.9375rem;
             outline: none;
             transition: border-color 0.15s;
         }
-        .app-input:focus { border-color: #3b82f6; }
+        .app-input:focus { border-color: var(--app-primary, #3b82f6); box-shadow: 0 0 0 2px rgba(59,130,246,0.2); }
         .app-input:disabled { opacity: 0.5; }
 
         .app-textarea {
             width: 100%;
-            background: #374151;
-            color: #f3f4f6;
-            border: 1px solid #4b5563;
+            background: var(--app-input-bg, #374151);
+            color: var(--app-text, #f3f4f6);
+            border: 1px solid var(--app-border, #4b5563);
             border-radius: 0.5rem;
             padding: 0.5rem 0.75rem;
             font-size: 0.9375rem;
@@ -56,20 +72,20 @@
             resize: vertical;
             transition: border-color 0.15s;
         }
-        .app-textarea:focus { border-color: #3b82f6; }
+        .app-textarea:focus { border-color: var(--app-primary, #3b82f6); box-shadow: 0 0 0 2px rgba(59,130,246,0.2); }
 
         .app-select {
             width: 100%;
-            background: #374151;
-            color: #f3f4f6;
-            border: 1px solid #4b5563;
+            background: var(--app-input-bg, #374151);
+            color: var(--app-text, #f3f4f6);
+            border: 1px solid var(--app-border, #4b5563);
             border-radius: 0.5rem;
             padding: 0.5rem 0.75rem;
             font-size: 0.9375rem;
             outline: none;
             cursor: pointer;
         }
-        .app-select:focus { border-color: #3b82f6; }
+        .app-select:focus { border-color: var(--app-primary, #3b82f6); }
 
         .app-btn {
             border-radius: 0.5rem;
@@ -80,64 +96,87 @@
             transition: all 0.15s;
             border: none;
         }
-        .app-btn.primary  { background: #2563eb; color: white; }
-        .app-btn.primary:hover  { background: #1d4ed8; }
-        .app-btn.secondary { background: #374151; color: #f3f4f6; border: 1px solid #4b5563; }
-        .app-btn.secondary:hover { background: #4b5563; }
+        .app-btn.primary  { background: var(--app-primary, #2563eb); color: white; }
+        .app-btn.primary:hover  { background: var(--app-primary-hover, #1d4ed8); }
+        .app-btn.secondary { background: var(--app-surface-2, #374151); color: var(--app-text, #f3f4f6); border: 1px solid var(--app-border, #4b5563); }
+        .app-btn.secondary:hover { opacity: 0.85; }
         .app-btn.danger   { background: #dc2626; color: white; }
         .app-btn.danger:hover   { background: #b91c1c; }
         .app-btn:disabled { opacity: 0.45; cursor: not-allowed; }
 
         .app-card {
-            background: #1f2937;
-            border: 1px solid #374151;
+            background: var(--app-surface, #1f2937);
+            border: 1px solid var(--app-border, #374151);
             border-radius: 0.75rem;
             padding: 1.25rem;
         }
 
+        .app-comp-heading { color: var(--app-heading, #f9fafb); }
+
         .app-table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
         .app-table th { background: rgba(255,255,255,0.05); font-weight: 600; text-align: left;
-                        padding: 0.6rem 0.75rem; border-bottom: 1px solid #374151; color: #d1d5db; }
-        .app-table td { padding: 0.55rem 0.75rem; border-bottom: 1px solid #1f2937; color: #e5e7eb; }
+                        padding: 0.6rem 0.75rem; border-bottom: 1px solid var(--app-border,#374151); color: var(--app-text-muted,#d1d5db); }
+        .app-table td { padding: 0.55rem 0.75rem; border-bottom: 1px solid var(--app-surface,#1f2937); color: var(--app-text,#e5e7eb); }
         .app-table tr:last-child td { border-bottom: none; }
         .app-table tr:hover td { background: rgba(255,255,255,0.03); }
 
-        .app-divider { border: none; border-top: 1px solid #374151; margin: 0.5rem 0; }
+        .app-divider { border: none; border-top: 1px solid var(--app-border, #374151); margin: 0.5rem 0; }
 
-        .app-slider { width: 100%; accent-color: #3b82f6; cursor: pointer; }
-        .slider-value { font-size: 0.875rem; color: #9ca3af; margin-left: 0.5rem; }
+        .app-slider { width: 100%; cursor: pointer; accent-color: var(--app-primary, #3b82f6); }
+        .slider-value { font-size: 0.875rem; color: var(--app-text-muted, #9ca3af); margin-left: 0.5rem; }
 
         .app-result-box {
-            background: #111827;
-            border: 1px solid #374151;
+            background: var(--app-result-bg, #111827);
+            border: 1px solid var(--app-border, #374151);
             border-radius: 0.5rem;
             padding: 0.75rem 1rem;
             min-height: 3rem;
             font-size: 0.9375rem;
-            color: #d1d5db;
+            color: var(--app-text, #d1d5db);
             white-space: pre-wrap;
             word-break: break-word;
         }
-        .app-result-box.loading { color: #6b7280; font-style: italic; }
+        .app-result-box.loading { color: var(--app-text-muted, #6b7280); font-style: italic; }
 
         /* Typing indicator inside results */
-        .app-typing { display: flex; align-items: center; gap: 0.5rem; color: #6b7280; font-style: italic; }
+        .app-typing { display: flex; align-items: center; gap: 0.5rem; color: var(--app-text-muted,#6b7280); font-style: italic; }
         .app-typing-dots span { animation: blink 1.4s infinite both; }
         .app-typing-dots span:nth-child(2) { animation-delay: 0.2s; }
         .app-typing-dots span:nth-child(3) { animation-delay: 0.4s; }
 
         /* ── Light theme ─────────────────────────────────────────────── */
         body.app-theme-light { background-color: #F9FAFB; color: #111827; }
+        body.app-theme-light #app-canvas {
+            --app-surface:    #ffffff;
+            --app-surface-2:  #f3f4f6;
+            --app-border:     #e5e7eb;
+            --app-text:       #111827;
+            --app-text-muted: #6b7280;
+            --app-heading:    #111827;
+            --app-input-bg:   #ffffff;
+            --app-result-bg:  #f3f4f6;
+        }
         body.app-theme-light .app-label { color: #6B7280; }
-        body.app-theme-light .app-input  { background: #fff; color: #111827; border-color: #D1D5DB; }
-        body.app-theme-light .app-textarea { background: #fff; color: #111827; border-color: #D1D5DB; }
-        body.app-theme-light .app-select { background: #fff; color: #111827; border-color: #D1D5DB; }
-        body.app-theme-light .app-result-box { background: #F3F4F6; border-color: #E5E7EB; color: #374151; }
+        body.app-theme-light .app-result-box { border-color: #E5E7EB; color: #374151; }
         body.app-theme-light .app-table th { background: rgba(0,0,0,0.04); color: #374151; border-color: #E5E7EB; }
         body.app-theme-light .app-table td { color: #111827; border-color: #F3F4F6; }
         body.app-theme-light .app-table tr:hover td { background: rgba(0,0,0,0.02); }
         body.app-theme-light .app-divider { border-color: #E5E7EB; }
         body.app-theme-light .slider-value { color: #6B7280; }
+        body.app-theme-light .app-card {
+            background: white;
+            border: 1px solid #E5E7EB;
+            border-radius: 1.25rem;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+            transition: box-shadow 0.3s, transform 0.3s;
+        }
+        body.app-theme-light .app-card:hover { box-shadow: 0 8px 24px rgba(0,0,0,0.08); transform: translateY(-2px); }
+        body.app-theme-light .app-card.color-blue   { border-color: #BFDBFE; }
+        body.app-theme-light .app-card.color-purple { border-color: #DDD6FE; }
+        body.app-theme-light .app-card.color-teal   { border-color: #99F6E4; }
+        body.app-theme-light .app-card.color-rose   { border-color: #FECDD3; }
+        body.app-theme-light .app-card.color-amber  { border-color: #FDE68A; }
+        body.app-theme-light .app-card-body { color: #6B7280; }
 
         /* ── Card with color accent ──────────────────────────────────── */
         .app-card { position: relative; overflow: hidden; }
@@ -150,18 +189,6 @@
         .app-card-overlay.color-rose   { background: linear-gradient(135deg, rgba(244,63,94,0), rgba(244,63,94,0.08)); }
         .app-card-overlay.color-amber  { background: linear-gradient(135deg, rgba(245,158,11,0), rgba(245,158,11,0.08)); }
 
-        /* Light-mode card overrides */
-        body.app-theme-light .app-card {
-            background: white; border: 1px solid #E5E7EB; border-radius: 1.25rem;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.05); transition: box-shadow 0.3s, transform 0.3s;
-        }
-        body.app-theme-light .app-card:hover { box-shadow: 0 8px 24px rgba(0,0,0,0.08); transform: translateY(-2px); }
-        body.app-theme-light .app-card.color-blue   { border-color: #BFDBFE; }
-        body.app-theme-light .app-card.color-purple { border-color: #DDD6FE; }
-        body.app-theme-light .app-card.color-teal   { border-color: #99F6E4; }
-        body.app-theme-light .app-card.color-rose   { border-color: #FECDD3; }
-        body.app-theme-light .app-card.color-amber  { border-color: #FDE68A; }
-
         /* Card inner layout helpers */
         .app-card-content { position: relative; }
         .app-card-header { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1rem; }
@@ -173,7 +200,6 @@
         .app-card-icon.color-amber  { color: #F59E0B; }
         .app-card-title { font-size: 1.25rem; font-weight: 700; }
         .app-card-body  { font-size: 0.875rem; }
-        body.app-theme-light .app-card-body { color: #6B7280; }
 
         /* Gradient text */
         .gradient-text-blue   { background: linear-gradient(90deg,#3B82F6,#1E40AF); -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text; }
@@ -185,10 +211,45 @@
         /* ── Stat component ──────────────────────────────────────────── */
         .app-stat { display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; padding: 0.5rem; }
         .app-stat-number { font-size: 3.5rem; font-weight: 800; line-height: 1.1; margin-bottom: 0.4rem; }
-        .app-stat-label  { font-size: 1rem; font-weight: 600; }
-        body.app-theme-light .app-stat-label { color: #111827; }
-        .app-stat-desc   { font-size: 0.8125rem; margin-top: 0.25rem; }
-        body.app-theme-light .app-stat-desc { color: #6B7280; }
+        .app-stat-label  { font-size: 1rem; font-weight: 600; color: var(--app-text, inherit); }
+        .app-stat-desc   { font-size: 0.8125rem; margin-top: 0.25rem; color: var(--app-text-muted, #6B7280); }
+
+        /* ── Feedback section ────────────────────────────────────────── */
+        .feedback-section {
+            border-top: 1px solid var(--app-border, #374151);
+            padding-top: 1.5rem;
+            margin-top: 2rem;
+        }
+        .feedback-section h3 { font-size: 0.875rem; font-weight: 600; color: var(--app-text-muted, #d1d5db); margin-bottom: 0.75rem; }
+        .feedback-row { display: flex; gap: 0.75rem; align-items: stretch; }
+        .feedback-input {
+            flex: 1;
+            background: var(--app-input-bg, #374151);
+            color: var(--app-text, #f3f4f6);
+            border: 1px solid var(--app-border, #4b5563);
+            border-radius: 0.5rem;
+            padding: 0.625rem 1rem;
+            font-size: 0.9375rem;
+            outline: none;
+            transition: border-color 0.15s;
+        }
+        .feedback-input:focus { border-color: var(--app-primary, #3b82f6); box-shadow: 0 0 0 2px rgba(59,130,246,0.2); }
+        .feedback-input::placeholder { color: var(--app-text-muted, #6b7280); }
+        .feedback-btn {
+            background: var(--app-primary, #2563eb);
+            color: white;
+            border: none;
+            border-radius: 0.5rem;
+            padding: 0.625rem 1.25rem;
+            font-size: 0.9375rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background 0.15s;
+            white-space: nowrap;
+        }
+        .feedback-btn:hover { background: var(--app-primary-hover, #1d4ed8); }
+        .feedback-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+        .feedback-hint { font-size: 0.75rem; color: var(--app-text-muted, #6b7280); margin-top: 0.5rem; }
     </style>
 </head>
 <body class="h-full bg-gray-900 text-gray-100 flex flex-col dark">
@@ -205,6 +266,10 @@
                class="text-sm text-gray-400 hover:text-gray-200 px-2 py-1.5 transition flex items-center gap-1">
                 <i class="fa-solid fa-arrow-left text-xs"></i> Back to Apps
             </a>
+            <button id="theme-toggle" class="text-sm text-gray-400 hover:text-gray-200 px-2 py-1.5 transition" title="Toggle theme">
+                <i class="fa-solid fa-sun" id="theme-sun" style="display:none"></i>
+                <i class="fa-solid fa-moon" id="theme-moon"></i>
+            </button>
             <button id="logout-btn" class="text-sm text-gray-400 hover:text-gray-200 px-2 py-1.5 transition">
                 Logout
             </button>
@@ -212,9 +277,13 @@
     </nav>
 
     <!-- App title bar -->
-    <div id="app-titlebar" class="hidden bg-gray-800/50 border-b border-gray-700/50 px-8 py-3 flex items-center gap-3">
+    <div id="app-titlebar" class="hidden bg-gray-800/50 border-b border-gray-700/50 px-8 py-3 flex items-center gap-3 shrink-0">
         <span id="app-title" class="font-semibold text-lg"></span>
-        <span id="app-desc" class="text-gray-400 text-sm"></span>
+        <span id="app-desc" class="text-gray-400 text-sm truncate"></span>
+        <span id="app-color-badge" class="hidden ml-auto text-xs text-gray-500 flex items-center gap-1">
+            <i class="fa-solid fa-palette"></i>
+            <span id="app-color-name"></span>
+        </span>
     </div>
 
     <!-- Loading / error states -->
@@ -232,23 +301,41 @@
     </div>
 
     <!-- App canvas -->
-    <div id="app-canvas" class="hidden flex-1 overflow-y-auto p-8">
+    <div id="app-canvas" class="hidden flex-1 overflow-y-auto p-6 md:p-8">
         <div id="app-root" class="max-w-5xl mx-auto app-grid"></div>
 
         <!-- Feedback section -->
-        <div class="max-w-5xl mx-auto mt-8 pt-6 border-t border-gray-700">
-            <h3 class="text-sm font-semibold text-gray-300 mb-3">Improve this app</h3>
-            <div class="flex gap-3">
-                <input id="feedback-input" type="text" placeholder="Describe what you'd like to change or improve..."
-                    class="flex-1 bg-gray-700 text-gray-100 rounded-lg px-4 py-2.5 outline-none focus:ring-2 focus:ring-blue-500 placeholder-gray-400">
-                <button id="feedback-btn" class="bg-blue-600 hover:bg-blue-500 text-white px-5 py-2.5 rounded-lg font-medium transition disabled:opacity-40">
-                    Regenerate
-                </button>
+        <div class="max-w-5xl mx-auto feedback-section">
+            <h3>Improve this app</h3>
+            <div class="feedback-row">
+                <input id="feedback-input" type="text"
+                    placeholder="Describe what you'd like to change or improve..."
+                    class="feedback-input">
+                <button id="feedback-btn" class="feedback-btn">Regenerate</button>
             </div>
-            <p class="text-xs text-gray-500 mt-2">The AI will update the app based on your feedback</p>
+            <p class="feedback-hint">The AI will update the app based on your feedback</p>
         </div>
     </div>
 
-    <script src="/app_viewer.js?v=2"></script>
+    <script src="/app_viewer.js?v=3"></script>
+    <script>
+        (function() {
+            var html = document.documentElement;
+            var sunEl = document.getElementById('theme-sun');
+            var moonEl = document.getElementById('theme-moon');
+            function updateIcons() {
+                var light = html.classList.contains('theme-light');
+                sunEl.style.display  = light ? '' : 'none';
+                moonEl.style.display = light ? 'none' : '';
+            }
+            updateIcons();
+            document.getElementById('theme-toggle').addEventListener('click', function() {
+                var light = html.classList.contains('theme-light');
+                html.classList.toggle('theme-light', !light);
+                localStorage.setItem('nanobot_theme', light ? 'dark' : 'light');
+                updateIcons();
+            });
+        })();
+    </script>
 </body>
 </html>

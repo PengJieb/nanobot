@@ -1,0 +1,25 @@
+{
+  "name": "Starry Night",
+  "description": "Cool blue-purple tones with warm peach and golden accents, inspired by night skies",
+  "colors": [
+    {"hex": "#11325D", "name": "deep-navy",    "role": "dark background / deepest surface"},
+    {"hex": "#36508B", "name": "slate-blue",   "role": "primary / buttons / nav"},
+    {"hex": "#736B9D", "name": "soft-purple",  "role": "secondary accent / tags"},
+    {"hex": "#B783AF", "name": "mauve",        "role": "highlight / muted accent"},
+    {"hex": "#F5A673", "name": "peach",        "role": "warm accent / call-to-action"},
+    {"hex": "#FCDB72", "name": "golden-yellow","role": "highlight / stat numbers / headings"}
+  ],
+  "suggested_theme_colors": {
+    "--app-primary":      "#36508B",
+    "--app-primary-hover":"#2A3E6F",
+    "--app-surface":      "#1A2B4A",
+    "--app-border":       "#2E4070",
+    "--app-text":         "#E8D5B7",
+    "--app-heading":      "#FCDB72",
+    "--app-text-muted":   "#B783AF",
+    "--app-input-bg":     "#162340",
+    "--app-result-bg":    "#0D1A30",
+    "--app-accent":       "#F5A673"
+  },
+  "card_colors": ["purple", "blue", "rose", "amber", "teal"]
+}

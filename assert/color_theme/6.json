@@ -1,0 +1,25 @@
+{
+  "name": "Van Gogh Warm",
+  "description": "Earthy burnt reds and golden ochres with cool indigo contrast, inspired by post-impressionism",
+  "colors": [
+    {"hex": "#BD3106", "name": "burnt-red",    "role": "strong accent / danger / emphasis"},
+    {"hex": "#D9700E", "name": "amber",        "role": "primary warm / buttons"},
+    {"hex": "#E9A00E", "name": "golden",       "role": "secondary warm / highlights"},
+    {"hex": "#EEBE04", "name": "golden-yellow","role": "bright accent / stat numbers"},
+    {"hex": "#5B7314", "name": "olive",        "role": "secondary green accent"},
+    {"hex": "#454B87", "name": "indigo",       "role": "cool contrast / nav / primary dark"}
+  ],
+  "suggested_theme_colors": {
+    "--app-primary":      "#454B87",
+    "--app-primary-hover":"#333876",
+    "--app-surface":      "#2A2D50",
+    "--app-border":       "#3A3F72",
+    "--app-text":         "#F5E8CC",
+    "--app-heading":      "#EEBE04",
+    "--app-text-muted":   "#D9700E",
+    "--app-input-bg":     "#1E2040",
+    "--app-result-bg":    "#141530",
+    "--app-accent":       "#BD3106"
+  },
+  "card_colors": ["amber", "purple", "rose", "amber", "blue"]
+}
