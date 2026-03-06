@@ -103,7 +103,8 @@ Use this exact structure:
 - **slider**: `{{"min": 0, "max": 100, "step": 1}}`
 - **table**: `{{"columns": [{{"key": "col", "label": "Column Header"}}]}}` — bind to array state var
 - **chart**: `{{"chart_type": "bar|line|pie", "x_key": "label", "y_key": "value"}}` — bind to array
-- **card**: `{{"title": "Card title", "body": "Card body text"}}` — can have click event
+- **card**: `{{"title": "Card title", "body": "Card body text", "icon": "fa-solid fa-<name>", "color": "blue|purple|teal|rose|amber"}}` — color adds gradient accent and colored title; can have click event
+- **stat**: `{{"number": "98%", "stat_label": "Projects completed", "description": "Optional detail text", "color": "blue|purple|teal|rose|amber"}}` — large-number highlight card, ideal for key metrics
 - **divider**: no properties needed
 
 ## Event Types
@@ -124,6 +125,8 @@ Use this exact structure:
 
 - Always start with a heading component (row 0)
 - Use `layout.type = "dashboard"` for complex multi-panel apps, `"single-page"` otherwise
+- Use `layout.theme = "light"` for informational/report pages (white background, color-accented cards); use `"dark"` for tool/productivity apps
+- For light-theme dashboard pages, prefer **card** and **stat** components with `color` set to one of: blue, purple, teal, rose, amber
 - Prefer agent events for AI-driven features; local events for simple UI changes
 - For tables and charts, always bind to an array state variable
 - `agent_prompt` template variables use double curly braces: `{{{{state.varName}}}}`

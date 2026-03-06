@@ -125,6 +125,70 @@
         .app-typing-dots span { animation: blink 1.4s infinite both; }
         .app-typing-dots span:nth-child(2) { animation-delay: 0.2s; }
         .app-typing-dots span:nth-child(3) { animation-delay: 0.4s; }
+
+        /* ── Light theme ─────────────────────────────────────────────── */
+        body.app-theme-light { background-color: #F9FAFB; color: #111827; }
+        body.app-theme-light .app-label { color: #6B7280; }
+        body.app-theme-light .app-input  { background: #fff; color: #111827; border-color: #D1D5DB; }
+        body.app-theme-light .app-textarea { background: #fff; color: #111827; border-color: #D1D5DB; }
+        body.app-theme-light .app-select { background: #fff; color: #111827; border-color: #D1D5DB; }
+        body.app-theme-light .app-result-box { background: #F3F4F6; border-color: #E5E7EB; color: #374151; }
+        body.app-theme-light .app-table th { background: rgba(0,0,0,0.04); color: #374151; border-color: #E5E7EB; }
+        body.app-theme-light .app-table td { color: #111827; border-color: #F3F4F6; }
+        body.app-theme-light .app-table tr:hover td { background: rgba(0,0,0,0.02); }
+        body.app-theme-light .app-divider { border-color: #E5E7EB; }
+        body.app-theme-light .slider-value { color: #6B7280; }
+
+        /* ── Card with color accent ──────────────────────────────────── */
+        .app-card { position: relative; overflow: hidden; }
+        .app-card-overlay {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none;
+        }
+        .app-card-overlay.color-blue   { background: linear-gradient(135deg, rgba(59,130,246,0), rgba(59,130,246,0.08)); }
+        .app-card-overlay.color-purple { background: linear-gradient(135deg, rgba(139,92,246,0), rgba(139,92,246,0.08)); }
+        .app-card-overlay.color-teal   { background: linear-gradient(135deg, rgba(20,184,166,0), rgba(20,184,166,0.08)); }
+        .app-card-overlay.color-rose   { background: linear-gradient(135deg, rgba(244,63,94,0), rgba(244,63,94,0.08)); }
+        .app-card-overlay.color-amber  { background: linear-gradient(135deg, rgba(245,158,11,0), rgba(245,158,11,0.08)); }
+
+        /* Light-mode card overrides */
+        body.app-theme-light .app-card {
+            background: white; border: 1px solid #E5E7EB; border-radius: 1.25rem;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.05); transition: box-shadow 0.3s, transform 0.3s;
+        }
+        body.app-theme-light .app-card:hover { box-shadow: 0 8px 24px rgba(0,0,0,0.08); transform: translateY(-2px); }
+        body.app-theme-light .app-card.color-blue   { border-color: #BFDBFE; }
+        body.app-theme-light .app-card.color-purple { border-color: #DDD6FE; }
+        body.app-theme-light .app-card.color-teal   { border-color: #99F6E4; }
+        body.app-theme-light .app-card.color-rose   { border-color: #FECDD3; }
+        body.app-theme-light .app-card.color-amber  { border-color: #FDE68A; }
+
+        /* Card inner layout helpers */
+        .app-card-content { position: relative; }
+        .app-card-header { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1rem; }
+        .app-card-icon { font-size: 1.375rem; }
+        .app-card-icon.color-blue   { color: #3B82F6; }
+        .app-card-icon.color-purple { color: #8B5CF6; }
+        .app-card-icon.color-teal   { color: #14B8A6; }
+        .app-card-icon.color-rose   { color: #F43F5E; }
+        .app-card-icon.color-amber  { color: #F59E0B; }
+        .app-card-title { font-size: 1.25rem; font-weight: 700; }
+        .app-card-body  { font-size: 0.875rem; }
+        body.app-theme-light .app-card-body { color: #6B7280; }
+
+        /* Gradient text */
+        .gradient-text-blue   { background: linear-gradient(90deg,#3B82F6,#1E40AF); -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text; }
+        .gradient-text-purple { background: linear-gradient(90deg,#8B5CF6,#6D28D9); -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text; }
+        .gradient-text-teal   { background: linear-gradient(90deg,#14B8A6,#0F766E); -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text; }
+        .gradient-text-rose   { background: linear-gradient(90deg,#F43F5E,#BE123C); -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text; }
+        .gradient-text-amber  { background: linear-gradient(90deg,#F59E0B,#B45309); -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text; }
+
+        /* ── Stat component ──────────────────────────────────────────── */
+        .app-stat { display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; padding: 0.5rem; }
+        .app-stat-number { font-size: 3.5rem; font-weight: 800; line-height: 1.1; margin-bottom: 0.4rem; }
+        .app-stat-label  { font-size: 1rem; font-weight: 600; }
+        body.app-theme-light .app-stat-label { color: #111827; }
+        .app-stat-desc   { font-size: 0.8125rem; margin-top: 0.25rem; }
+        body.app-theme-light .app-stat-desc { color: #6B7280; }
     </style>
 </head>
 <body class="h-full bg-gray-900 text-gray-100 flex flex-col dark">

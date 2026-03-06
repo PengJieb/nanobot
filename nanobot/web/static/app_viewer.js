@@ -236,10 +236,16 @@
     function buildCell(comp) {
         var layout = comp.layout || {};
         var colSpan = layout.colSpan || layout.col_span || 12;
+        var col     = layout.col     != null ? layout.col     : 0;
+        var row     = layout.row     != null ? layout.row     : 0;
+        var rowSpan = layout.rowSpan || layout.row_span || 1;
         var cell = document.createElement("div");
         cell.className = "app-cell";
-        cell.style.gridColumn = "span " + colSpan;
-        if (layout.rowSpan > 1) cell.style.gridRow = "span " + layout.rowSpan;
+        // Explicit placement so components always land on the correct grid row/col
+        cell.style.gridColumn = (col + 1) + " / span " + colSpan;
+        cell.style.gridRow    = rowSpan > 1
+            ? (row + 1) + " / span " + rowSpan
+            : String(row + 1);
         cell.setAttribute("data-comp-id", comp.id);
         return cell;
     }
@@ -562,25 +568,50 @@
 
             case "card": {
                 inner = document.createElement("div");
-                inner.className = "app-card";
-                if (comp.properties.title) {
-                    var h = document.createElement("div");
-                    h.className = "font-semibold text-gray-100 mb-1";
-                    var title = comp.properties.title;
-                    h.textContent = resolveTemplate(title);
-                    extractStateVars(title).forEach(function(varName) {
-                        registerBinding(varName, function() { h.textContent = resolveTemplate(title); });
-                    });
-                    inner.appendChild(h);
+                var color = comp.properties.color || "";
+                inner.className = "app-card" + (color ? " color-" + color : "");
+
+                // Subtle gradient overlay
+                if (color) {
+                    var overlay = document.createElement("div");
+                    overlay.className = "app-card-overlay color-" + color;
+                    inner.appendChild(overlay);
                 }
-                var body = document.createElement("div");
-                body.className = "text-sm text-gray-400";
+
+                var content = document.createElement("div");
+                content.className = "app-card-content";
+
+                // Header: optional icon + title
+                if (comp.properties.icon || comp.properties.title) {
+                    var header = document.createElement("div");
+                    header.className = "app-card-header";
+                    if (comp.properties.icon) {
+                        var iconEl = document.createElement("i");
+                        iconEl.className = comp.properties.icon + " app-card-icon" + (color ? " color-" + color : "");
+                        header.appendChild(iconEl);
+                    }
+                    if (comp.properties.title) {
+                        var titleEl = document.createElement("div");
+                        titleEl.className = "app-card-title" + (color ? " gradient-text-" + color : " font-semibold text-gray-100");
+                        var titleText = comp.properties.title;
+                        titleEl.textContent = resolveTemplate(titleText);
+                        extractStateVars(titleText).forEach(function(varName) {
+                            registerBinding(varName, function() { titleEl.textContent = resolveTemplate(titleText); });
+                        });
+                        header.appendChild(titleEl);
+                    }
+                    content.appendChild(header);
+                }
+
+                var bodyEl = document.createElement("div");
+                bodyEl.className = "app-card-body";
                 var bodyText = comp.properties.body || comp.label || "";
-                body.textContent = resolveTemplate(bodyText);
+                bodyEl.textContent = resolveTemplate(bodyText);
                 extractStateVars(bodyText).forEach(function(varName) {
-                    registerBinding(varName, function() { body.textContent = resolveTemplate(bodyText); });
+                    registerBinding(varName, function() { bodyEl.textContent = resolveTemplate(bodyText); });
                 });
-                inner.appendChild(body);
+                content.appendChild(bodyEl);
+                inner.appendChild(content);
                 // Don't call wireEvents here - it's called at the end of buildComponent
                 break;
             }
@@ -596,6 +627,47 @@
                 inner.className = "max-w-full rounded-lg";
                 inner.src = comp.properties.src || "";
                 inner.alt = comp.label || "";
+                break;
+            }
+
+            case "stat": {
+                inner = document.createElement("div");
+                var color = comp.properties.color || "";
+                inner.className = "app-card app-stat" + (color ? " color-" + color : "");
+
+                if (color) {
+                    var overlay = document.createElement("div");
+                    overlay.className = "app-card-overlay color-" + color;
+                    inner.appendChild(overlay);
+                }
+
+                var content = document.createElement("div");
+                content.className = "app-card-content";
+
+                var numEl = document.createElement("div");
+                numEl.className = "app-stat-number" + (color ? " gradient-text-" + color : "");
+                var numText = comp.properties.number || comp.label || "0";
+                numEl.textContent = resolveTemplate(numText);
+                extractStateVars(numText).forEach(function(v) {
+                    registerBinding(v, function() { numEl.textContent = resolveTemplate(numText); });
+                });
+                content.appendChild(numEl);
+
+                if (comp.properties.stat_label) {
+                    var lblEl = document.createElement("div");
+                    lblEl.className = "app-stat-label";
+                    lblEl.textContent = comp.properties.stat_label;
+                    content.appendChild(lblEl);
+                }
+
+                if (comp.properties.description) {
+                    var descEl = document.createElement("div");
+                    descEl.className = "app-stat-desc";
+                    descEl.textContent = comp.properties.description;
+                    content.appendChild(descEl);
+                }
+
+                inner.appendChild(content);
                 break;
             }
 
@@ -640,6 +712,17 @@
             appTitleEl.textContent = spec.title || "App";
             appDescEl.textContent = spec.description || "";
             appTitlebar.classList.remove("hidden");
+
+            // Apply theme to body
+            var theme = (spec.layout && spec.layout.theme) || "dark";
+            if (theme === "light") {
+                document.body.classList.add("app-theme-light");
+                document.body.classList.remove("bg-gray-900", "text-gray-100");
+                document.body.classList.add("text-gray-900");
+            } else {
+                document.body.classList.remove("app-theme-light", "text-gray-900");
+                document.body.classList.add("bg-gray-900", "text-gray-100");
+            }
 
             // Initialize state from spec (preserve existing values)
             var vars = (spec.state && spec.state.variables) || [];
