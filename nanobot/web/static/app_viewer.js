@@ -254,9 +254,11 @@
                 inner = document.createElement("div");
                 inner.className = "app-result-box msg-content";
                 inner.setAttribute("data-state-bind", comp.bind || "");
+                console.log("Creating text component:", comp.id, "bind:", comp.bind, "has data-result-display:", !!comp.bind);
                 if (comp.bind) {
                     inner.setAttribute("data-result-display", "1");
                     registerBinding(comp.bind, function (val) {
+                        console.log("Text component binding triggered for:", comp.bind, "value type:", typeof val);
                         if (typeof val === "string") {
                             try { inner.innerHTML = marked.parse(val); }
                             catch (e) { inner.textContent = val; }
