@@ -619,16 +619,22 @@
             appDescEl.textContent = spec.description || "";
             appTitlebar.classList.remove("hidden");
 
-            // Initialize state from spec
+            // Initialize state from spec (preserve existing values)
             var vars = (spec.state && spec.state.variables) || [];
             vars.forEach(function (v) {
-                state[v.name] = v.default != null ? v.default : (
-                    v.type === "array" ? [] :
-                    v.type === "object" ? {} :
-                    v.type === "boolean" ? false :
-                    v.type === "number" ? 0 : ""
-                );
+                if (state[v.name] === undefined) {
+                    state[v.name] = v.default != null ? v.default : (
+                        v.type === "array" ? [] :
+                        v.type === "object" ? {} :
+                        v.type === "boolean" ? false :
+                        v.type === "number" ? 0 : ""
+                    );
+                }
             });
+
+            // Clear old bindings and DOM
+            stateBindings = {};
+            appRoot.innerHTML = "";
 
             // Sort components by row then col
             var comps = (spec.components || []).slice();
