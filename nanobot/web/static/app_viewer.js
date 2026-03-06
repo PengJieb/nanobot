@@ -110,12 +110,26 @@
             }
 
             if (resultBind) {
+                // Strip markdown code fences if present
+                var cleaned = result.trim();
+                if (cleaned.startsWith("```")) {
+                    // Remove opening fence (```json or ```)
+                    cleaned = cleaned.replace(/^```[a-z]*\n?/, "");
+                    // Remove closing fence
+                    cleaned = cleaned.replace(/\n?```$/, "");
+                    cleaned = cleaned.trim();
+                }
+
                 // Try to parse as JSON array/object first, else store as string
-                var parsed = result;
+                var parsed = cleaned;
                 try {
-                    var j = JSON.parse(result);
+                    var j = JSON.parse(cleaned);
                     if (Array.isArray(j) || (typeof j === "object" && j !== null)) parsed = j;
-                } catch (e) {}
+                } catch (e) {
+                    // If JSON parse fails, use the cleaned string
+                    parsed = cleaned;
+                }
+                console.log("Setting state with parsed value, type:", typeof parsed);
                 setState(resultBind, parsed);
             }
 
@@ -368,7 +382,7 @@
                 inner = document.createElement("button");
                 inner.className = "app-btn " + (comp.properties.variant || "primary");
                 inner.textContent = comp.label || "Click";
-                wireEvents(inner, comp.events, comp);
+                // Don't call wireEvents here - it's called at the end of buildComponent
                 break;
             }
 
@@ -567,7 +581,7 @@
                     registerBinding(varName, function() { body.textContent = resolveTemplate(bodyText); });
                 });
                 inner.appendChild(body);
-                wireEvents(inner, comp.events, comp);
+                // Don't call wireEvents here - it's called at the end of buildComponent
                 break;
             }
 
