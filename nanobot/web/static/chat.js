@@ -149,6 +149,12 @@
         var text = input.value.trim();
         if (!text || busy) return;
 
+        // #app trigger — redirect to the application builder
+        if (text.toLowerCase().startsWith("#app")) {
+            window.location.href = "/app_builder.html";
+            return;
+        }
+
         addMessage("user", escapeHtml(text), text);
         input.value = "";
         input.style.height = "auto";

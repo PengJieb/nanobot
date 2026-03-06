@@ -17,6 +17,7 @@ from nanobot.web.auth import AuthManager
 if TYPE_CHECKING:
     from nanobot.agent.loop import AgentLoop
     from nanobot.agent.skills import SkillsLoader
+    from nanobot.app.manager import AppManager
 
 STATIC_DIR = Path(__file__).parent / "static"
 
@@ -99,6 +100,7 @@ def create_app(
     agent: AgentLoop,
     skills_loader: SkillsLoader,
     auth: AuthManager | None = None,
+    app_manager: AppManager | None = None,
 ) -> FastAPI:
     """Create the FastAPI application with all routes."""
     app = FastAPI(title="nanobot web")
@@ -308,6 +310,138 @@ def create_app(
         logic_path.write_text(result or "", encoding="utf-8")
 
         return {"logic": result or ""}
+
+    # ------------------------------------------------------------------
+    # Application builder endpoints
+    # ------------------------------------------------------------------
+
+    if app_manager is not None:
+        from nanobot.app.builder import AppBuilder
+        from nanobot.app.schema import QUESTIONS
+
+        @app.post("/api/app/build/start")
+        async def app_build_start():
+            session = AppBuilder.start_session()
+            return {
+                "session_id": session.session_id,
+                "question_index": 0,
+                "question": session.current_question,
+                "total_questions": len(QUESTIONS),
+            }
+
+        @app.post("/api/app/build/{session_id}/answer")
+        async def app_build_answer(session_id: str, request: Request):
+            body = await request.json()
+            answer = (body.get("answer") or "").strip()
+            if not answer:
+                raise HTTPException(status_code=400, detail="answer is required")
+
+            session = AppBuilder.answer(session_id, answer)
+            if session is None:
+                raise HTTPException(status_code=404, detail="session not found")
+
+            if session.is_complete:
+                return {"status": "complete", "session_id": session_id}
+
+            return {
+                "status": "continue",
+                "question_index": session.current_question_index,
+                "question": session.current_question,
+                "total_questions": len(QUESTIONS),
+            }
+
+        @app.post("/api/app/build/{session_id}/generate")
+        async def app_build_generate(session_id: str):
+            session = AppBuilder.get_session(session_id)
+            if session is None:
+                raise HTTPException(status_code=404, detail="session not found")
+            if not session.is_complete:
+                raise HTTPException(status_code=400, detail="not all questions answered")
+
+            queue: asyncio.Queue[dict] = asyncio.Queue()
+
+            async def _run():
+                try:
+                    spec = await AppBuilder.generate(session, agent, app_manager)
+                    await queue.put({"type": "done", "app_id": spec.id, "title": spec.title})
+                except Exception as exc:
+                    await queue.put({"type": "error", "content": str(exc)})
+
+            task = asyncio.create_task(_run())
+
+            async def _stream():
+                await queue.put({"type": "progress", "content": "Designing your application..."})
+                while True:
+                    try:
+                        event = await asyncio.wait_for(queue.get(), timeout=120)
+                    except asyncio.TimeoutError:
+                        yield 'data: {"type": "error", "content": "timeout"}\n\n'
+                        break
+                    yield f"data: {_json.dumps(event)}\n\n"
+                    if event["type"] in ("done", "error"):
+                        break
+                await task
+
+            return StreamingResponse(_stream(), media_type="text/event-stream")
+
+        @app.get("/api/apps")
+        async def list_apps():
+            return {"apps": app_manager.list_apps()}
+
+        @app.get("/api/app/{app_id}")
+        async def get_app(app_id: str):
+            spec = app_manager.get(app_id)
+            if spec is None:
+                raise HTTPException(status_code=404, detail="app not found")
+            return spec.to_dict()
+
+        @app.delete("/api/app/{app_id}")
+        async def delete_app(app_id: str):
+            if not app_manager.delete(app_id):
+                raise HTTPException(status_code=404, detail="app not found")
+            return {"status": "deleted"}
+
+        @app.post("/api/app/{app_id}/action")
+        async def app_action(app_id: str, request: Request):
+            """Handle an agent event triggered by the app viewer."""
+            spec = app_manager.get(app_id)
+            if spec is None:
+                raise HTTPException(status_code=404, detail="app not found")
+
+            body = await request.json()
+            prompt = (body.get("prompt") or "").strip()
+            if not prompt:
+                raise HTTPException(status_code=400, detail="prompt is required")
+
+            queue: asyncio.Queue[dict] = asyncio.Queue()
+
+            async def _run():
+                try:
+                    result = await agent.process_direct(
+                        prompt,
+                        session_key=f"app:{app_id}",
+                        channel="web",
+                        chat_id=f"app-{app_id}",
+                    )
+                    await queue.put({"type": "done", "content": result or ""})
+                except Exception as exc:
+                    await queue.put({"type": "error", "content": str(exc)})
+
+            task = asyncio.create_task(_run())
+
+            async def _stream():
+                while True:
+                    try:
+                        event = await asyncio.wait_for(queue.get(), timeout=120)
+                    except asyncio.TimeoutError:
+                        yield 'data: {"type": "error", "content": "timeout"}\n\n'
+                        break
+                    yield f"data: {_json.dumps(event)}\n\n"
+                    if event["type"] in ("done", "error"):
+                        break
+                await task
+
+            return StreamingResponse(_stream(), media_type="text/event-stream")
 
     # ------------------------------------------------------------------
     # Static files (must be last so API routes take precedence)

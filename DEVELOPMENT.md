@@ -200,6 +200,11 @@ nanobot/
 │   │   └── memory/
 │   │       ├── MEMORY.md       # 长期记忆模板
 │   │       └── HISTORY.md      # 历史日志模板
+│   ├── app/                    # Application Builder 模块
+│   │   ├── __init__.py
+│   │   ├── schema.py           # AppSpec / BuildSession / ComponentLayout 等 Pydantic 模型
+│   │   ├── manager.py          # AppManager — apps/ 目录的 CRUD 操作
+│   │   └── builder.py          # AppBuilder — 10 问对话流程 + 调用 agent 生成 AppSpec
 │   └── utils/
 │       └── helpers.py          # 工具函数（路径、时间戳、模板同步）
 ├── bridge/                     # WhatsApp Node.js/TypeScript bridge
@@ -707,6 +712,118 @@ SpawnTool.execute(task, label)
   → 主 AgentLoop 处理结果，自然地告知用户
 ```
 
+### Application Builder
+
+**文件**：`nanobot/app/schema.py`, `nanobot/app/manager.py`, `nanobot/app/builder.py`
+
+Application Builder 让用户通过 10 问对话流程生成可运行的 Web 应用。
+
+#### 数据模型（`schema.py`）
+
+```python
+class AppSpec(BaseModel):          # 完整应用规格（持久化为 JSON）
+    id: str                        # 12 位 hex ID
+    title: str
+    description: str
+    version: str                   # 默认 "1.0"
+    created_at: datetime
+    layout: AppLayout              # type: "single-page"|"dashboard"|"wizard"
+    state: AppState                # 应用状态变量列表
+    components: list[AppComponent] # UI 组件列表
+
+class AppComponent(BaseModel):
+    id: str
+    type: str                      # heading/text/input/textarea/select/button/...
+    label: str
+    properties: dict[str, Any]
+    layout: ComponentLayout        # row/col/colSpan/rowSpan
+    bind: str                      # 绑定的状态变量名
+    events: dict[str, ComponentEvent]  # click/change/submit 等事件
+
+class ComponentEvent(BaseModel):
+    type: str                      # "local" | "agent"
+    local_code: str                # 前端执行的 JS 代码
+    agent_prompt: str              # 发送给 agent 的 prompt 模板
+    result_bind: str               # 存储 agent 响应的状态变量
+
+class BuildSession(BaseModel):     # 内存中的构建会话（10 问进度跟踪）
+    session_id: str
+    answers: list[str]
+    created_at: datetime
+
+    @property
+    def current_question_index(self) -> int: ...   # = len(answers)
+    @property
+    def current_question(self) -> str | None: ...  # None when is_complete
+    @property
+    def is_complete(self) -> bool: ...             # len(answers) >= 10
+```
+
+**重要**：`QUESTIONS` 是包含 10 个问题的模块级列表，是构建流程的核心。
+
+#### AppManager（`manager.py`）
+
+CRUD 操作，将 `AppSpec` 持久化为 `workspace/apps/{id}.json`：
+
+| 方法 | 说明 |
+|------|------|
+| `save(spec)` | 序列化并写入 JSON 文件 |
+| `get(app_id)` | 加载并验证 AppSpec；无效或缺失时返回 None |
+| `delete(app_id)` | 删除文件，返回 True/False |
+| `list_apps()` | 按修改时间倒序返回摘要 dict 列表 |
+| `new_id()` | 生成 12 字符 UUID hex |
+
+注意：`get()` 和 `list_apps()` 对损坏的 JSON 文件静默返回 None/跳过，不抛出异常。
+
+#### AppBuilder（`builder.py`）
+
+管理构建会话的生命周期和 spec 生成：
+
+```python
+class AppBuilder:
+    _sessions: dict[str, BuildSession] = {}  # 类级变量 — 跨实例共享
+
+    @classmethod
+    def start_session(cls) -> BuildSession: ...
+    @classmethod
+    def get_session(cls, session_id) -> BuildSession | None: ...
+    @classmethod
+    def answer(cls, session_id, answer) -> BuildSession | None: ...
+    # 注意：当 is_complete 时忽略新 answer（防止超额添加）
+    @classmethod
+    def discard_session(cls, session_id) -> None: ...
+    @classmethod
+    async def generate(cls, session, agent, app_manager) -> AppSpec: ...
+```
+
+**`generate()` 流程**：
+1. 将 10 问答案格式化为 requirements 文本
+2. 调用 `agent.process_direct()` 传入生成 prompt（session_key = `app:build:{session_id}`）
+3. `_parse_spec(raw)` 解析 agent 响应（处理 markdown fence、JSON 提取、colSpan 规整）
+4. `AppManager.save(spec)` 持久化
+5. `discard_session()` 清理内存会话
+
+**`_parse_spec()` 容错逻辑**：
+- 剥除 ` ``` ` 代码块 fence
+- 提取第一个 `{` 到最后一个 `}` 之间的内容
+- 将缺失 `colSpan`/`col_span` 的 layout 默认设为 12
+- 补全 event 字段默认值
+- 解析失败时返回 `_fallback_spec()`（含占位 heading + error text 组件）
+
+#### Web 端点（`web/server.py`）
+
+当 `app_manager is not None` 时激活以下端点：
+
+| 端点 | 说明 |
+|------|------|
+| `POST /api/app/build/start` | 创建新 BuildSession，返回第一个问题 |
+| `POST /api/app/build/{session_id}/answer` | 提交答案，返回下一个问题或 `status: complete` |
+| `POST /api/app/build/{session_id}/generate` | 触发 spec 生成（SSE 流式返回进度） |
+| `GET /api/apps` | 列出所有已存储的应用 |
+| `GET /api/app/{app_id}` | 获取应用的完整 spec |
+| `DELETE /api/app/{app_id}` | 删除应用 |
+| `POST /api/app/{app_id}/action` | 执行 agent 事件（SSE 流式），session_key = `app:{app_id}` |
+
 ### MCP 集成
 
 **文件**：`nanobot/agent/tools/mcp.py`
@@ -927,8 +1044,10 @@ def test_email(monkeypatch):
 | `test_task_cancel.py` | 任务取消 |
 | `test_cron_commands.py` | Cron CLI 命令 |
 | `test_cron_service.py` | Cron 服务 |
+| `test_cron_edge_cases.py` | Cron 调度边界（zero/past interval、tz 校验、CRUD 操作） |
 | `test_context_prompt_cache.py` | Prompt cache |
 | `test_memory_consolidation_types.py` | Memory consolidation 类型 |
+| `test_app_module.py` | App Builder 模块（AppManager CRUD、BuildSession 状态机、_parse_spec 解析、_fallback_spec） |
 
 ---
 

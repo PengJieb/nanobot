@@ -622,6 +622,7 @@ def web(
     from nanobot.bus.queue import MessageBus
     from nanobot.agent.loop import AgentLoop
     from nanobot.agent.skills import SkillsLoader
+    from nanobot.app.manager import AppManager
     from nanobot.cron.service import CronService
     from nanobot.web.auth import AuthManager
     from nanobot.web.server import create_app
@@ -661,7 +662,9 @@ def web(
     auth_store = get_data_dir() / "web" / "users.json"
     auth = AuthManager(auth_store, invite_code=invite_code)
 
-    fastapi_app = create_app(agent_loop, skills_loader, auth=auth)
+    app_manager = AppManager(config.workspace_path)
+
+    fastapi_app = create_app(agent_loop, skills_loader, auth=auth, app_manager=app_manager)
 
     console.print(f"{__logo__} Starting nanobot web UI at http://{host}:{port}")
     if invite_code:

@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>nanobot - Build App</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="stylesheet" href="/style.css">
+    <script>
+        tailwind.config = { darkMode: 'class', theme: { extend: {} } }
+    </script>
+</head>
+<body class="h-full bg-gray-900 text-gray-100 flex flex-col dark">
+    <!-- Nav -->
+    <nav class="bg-gray-800 border-b border-gray-700 px-6 py-3 flex items-center justify-between shrink-0">
+        <div class="flex items-center gap-4">
+            <span class="text-xl font-bold tracking-tight">🤖 nanobot</span>
+            <a href="/" class="text-gray-400 hover:text-gray-200">Chat</a>
+            <a href="/skills.html" class="text-gray-400 hover:text-gray-200">Skills</a>
+            <a href="/apps.html" class="text-gray-400 hover:text-gray-200">Apps</a>
+        </div>
+        <button id="logout-btn" class="text-sm text-gray-400 hover:text-gray-200 px-2 py-1.5 transition">
+            Logout
+        </button>
+    </nav>
+
+    <div class="flex-1 overflow-y-auto flex items-start justify-center px-4 py-10">
+        <div class="w-full max-w-2xl">
+
+            <!-- Header -->
+            <div class="text-center mb-8">
+                <div class="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-blue-900/50 mb-4">
+                    <i class="fa-solid fa-wand-magic-sparkles text-blue-400 text-2xl"></i>
+                </div>
+                <h1 class="text-3xl font-bold mb-2">Build an Application</h1>
+                <p class="text-gray-400">Answer 10 questions and the AI will generate a fully functional web app for you.</p>
+            </div>
+
+            <!-- Progress bar -->
+            <div class="mb-6">
+                <div class="flex justify-between text-xs text-gray-500 mb-1">
+                    <span id="progress-label">Question 1 of 10</span>
+                    <span id="progress-pct">0%</span>
+                </div>
+                <div class="w-full bg-gray-700 rounded-full h-1.5">
+                    <div id="progress-bar" class="bg-blue-500 h-1.5 rounded-full transition-all duration-500" style="width:0%"></div>
+                </div>
+            </div>
+
+            <!-- Q&A conversation area -->
+            <div id="conversation" class="space-y-4 mb-6"></div>
+
+            <!-- Input area (hidden during generation) -->
+            <div id="input-area">
+                <form id="answer-form" class="flex gap-3">
+                    <input
+                        id="answer-input"
+                        type="text"
+                        placeholder="Type your answer..."
+                        autocomplete="off"
+                        class="flex-1 bg-gray-700 text-gray-100 rounded-lg px-4 py-2.5 outline-none
+                               focus:ring-2 focus:ring-blue-500 placeholder-gray-400"
+                    >
+                    <button type="submit" id="submit-btn"
+                        class="bg-blue-600 hover:bg-blue-500 text-white px-5 py-2.5 rounded-lg
+                               font-medium transition disabled:opacity-40 disabled:cursor-not-allowed">
+                        Next
+                    </button>
+                </form>
+                <p class="text-xs text-gray-500 mt-2 text-center">Press Enter or click Next to continue</p>
+            </div>
+
+            <!-- Generating state -->
+            <div id="generating" class="hidden text-center py-8">
+                <div class="flex items-center justify-center gap-3 text-blue-400 mb-3">
+                    <i class="fa-solid fa-spinner fa-spin text-xl"></i>
+                    <span class="text-lg font-medium" id="generating-text">Designing your application...</span>
+                </div>
+                <p class="text-gray-500 text-sm">The AI is building your app spec. This usually takes 10–30 seconds.</p>
+            </div>
+
+        </div>
+    </div>
+
+    <script src="/app_builder.js"></script>
+</body>
+</html>
