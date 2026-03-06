@@ -181,6 +181,14 @@ def create_app(
         if not message:
             raise HTTPException(status_code=400, detail="message is required")
 
+        # Check for app construct command first
+        lower_msg = message.lower()
+        if lower_msg == "#app" or lower_msg.startswith("#app "):
+            raise HTTPException(
+                status_code=400,
+                detail="Please use the App Builder interface to create applications"
+            )
+
         queue: asyncio.Queue[dict] = asyncio.Queue()
 
         async def on_progress(content: str, *, tool_hint: bool = False) -> None:
