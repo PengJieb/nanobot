@@ -299,23 +299,60 @@ def _build_color_section() -> str:
 # ---------------------------------------------------------------------------
 
 
+def _extract_json_object(text: str) -> dict | None:
+    """Extract the first valid JSON object from text, trying each '{' position."""
+    pos = 0
+    while True:
+        start = text.find("{", pos)
+        if start == -1:
+            return None
+
+        brace_count = 0
+        end = -1
+        in_string = False
+        escape_next = False
+
+        for i in range(start, len(text)):
+            char = text[i]
+            if escape_next:
+                escape_next = False
+                continue
+            if char == "\\":
+                escape_next = True
+                continue
+            if char == '"':
+                in_string = not in_string
+                continue
+            if not in_string:
+                if char == "{":
+                    brace_count += 1
+                elif char == "}":
+                    brace_count -= 1
+                    if brace_count == 0:
+                        end = i
+                        break
+
+        if end == -1:
+            return None
+
+        candidate = text[start : end + 1]
+        try:
+            return json.loads(candidate)
+        except json.JSONDecodeError:
+            pos = start + 1
+
+
 def _parse_spec(raw: str, app_id: str) -> AppSpec:
     """Parse agent output into an AppSpec, with fallback on failure."""
-    # Strip markdown fences if present
     text = raw.strip()
-    fence = re.match(r"^```(?:json)?\s*\n?([\s\S]*?)```\s*$", text)
+
+    # Try to extract from a markdown code block anywhere in the text
+    fence = re.search(r"```(?:json)?\s*\n?([\s\S]*?)```", text)
     if fence:
         text = fence.group(1).strip()
 
-    # Find first { … last }
-    start = text.find("{")
-    end = text.rfind("}")
-    if start != -1 and end != -1:
-        text = text[start : end + 1]
-
-    try:
-        data = json.loads(text)
-    except json.JSONDecodeError:
+    data = _extract_json_object(text)
+    if data is None:
         return _fallback_spec(app_id, "Generated App", "Could not parse spec from agent response.")
 
     # Normalise component layouts (agent may omit colSpan alias)
