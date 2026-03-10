@@ -113,9 +113,7 @@
                 // Strip markdown code fences if present
                 var cleaned = result.trim();
                 if (cleaned.startsWith("```")) {
-                    // Remove opening fence (```json or ```)
                     cleaned = cleaned.replace(/^```[a-z]*\n?/, "");
-                    // Remove closing fence
                     cleaned = cleaned.replace(/\n?```$/, "");
                     cleaned = cleaned.trim();
                 }
@@ -126,7 +124,6 @@
                     var j = JSON.parse(cleaned);
                     if (Array.isArray(j) || (typeof j === "object" && j !== null)) parsed = j;
                 } catch (e) {
-                    // If JSON parse fails, use the cleaned string
                     parsed = cleaned;
                 }
                 console.log("Setting state with parsed value, type:", typeof parsed);
@@ -150,22 +147,23 @@
     }
 
     // ---------------------------------------------------------------------------
-    // Resolve template: replace {{expression}} with evaluated values
+    // Resolve template: replace {{expression}} with evaluated values.
+    // context is an optional object injected as second variable alongside state.
     // ---------------------------------------------------------------------------
 
-    function resolveTemplate(template) {
+    function resolveTemplate(template, context) {
         if (!template) return template;
+        context = context || {};
         return String(template).replace(/\{\{(.+?)\}\}/g, function (match, expr) {
             try {
-                // Create a function that evaluates the expression with state in scope
-                var fn = new Function('state', 'return (' + expr + ')');
-                var result = fn(state);
+                var fn = new Function('state', 'context', 'return (' + expr + ')');
+                var result = fn(state, context);
                 if (result == null) return "";
                 if (typeof result === "object") return JSON.stringify(result);
                 return String(result);
             } catch (e) {
                 console.warn("Template evaluation error:", expr, e);
-                return match; // Return original if evaluation fails
+                return match;
             }
         });
     }
@@ -176,7 +174,6 @@
         var matches = String(template).match(/\{\{(.+?)\}\}/g);
         if (!matches) return [];
         matches.forEach(function(m) {
-            // Extract state.varName references from the expression
             var expr = m.match(/\{\{(.+?)\}\}/)[1];
             var stateRefs = expr.match(/state\.(\w+)/g);
             if (stateRefs) {
@@ -190,13 +187,47 @@
     }
 
     // ---------------------------------------------------------------------------
-    // Event wiring
+    // Fire a single ComponentEvent with context
+    // Used by sub-element handlers (table row/cell, chart data point) that need
+    // to pass richer context beyond what the top-level wireEvents provides.
     // ---------------------------------------------------------------------------
 
-    function wireEvents(el, events, comp) {
+    function fireEvent(ev, domEv, context) {
+        if (!ev) return;
+        context = context || {};
+        if (ev.type === "local" && ev.local_code) {
+            try {
+                var value = context.value !== undefined ? context.value :
+                            (domEv && domEv.target ? domEv.target.value : undefined);
+                /* jshint evil:true */
+                (new Function("state", "setState", "getState", "event", "value", "context",
+                              ev.local_code))(state, setState, getState, domEv, value, context);
+            } catch (e) {
+                console.warn("Event handler error:", e);
+            }
+        } else if (ev.type === "agent" && ev.agent_prompt) {
+            var prompt = resolveTemplate(ev.agent_prompt, context);
+            var resultEl = ev.result_bind ? document.querySelector(
+                '[data-state-bind="' + ev.result_bind + '"][data-result-display]') : null;
+            callAgent(prompt, ev.result_bind, resultEl);
+        }
+    }
+
+    // ---------------------------------------------------------------------------
+    // Event wiring — attaches comp.events to an element.
+    // Events named "row_click" and "cell_click" are skipped here; they are
+    // handled explicitly inside the table renderRows function with row/cell context.
+    // context is passed through to local_code and template resolution.
+    // ---------------------------------------------------------------------------
+
+    var SUB_ELEMENT_EVENTS = ["row_click", "cell_click"];
+
+    function wireEvents(el, events, comp, context) {
         if (!events) return;
+        context = context || {};
         console.log("wireEvents called for component:", comp.id, "events:", Object.keys(events));
         Object.keys(events).forEach(function (evName) {
+            if (SUB_ELEMENT_EVENTS.indexOf(evName) !== -1) return;
             var ev = events[evName];
             if (!ev) return;
             var domEvent = evName === "click" ? "click" :
@@ -205,28 +236,16 @@
 
             el.addEventListener(domEvent, function (domEv) {
                 console.log("Event fired:", evName, "on component:", comp.id, "event type:", ev.type);
-                if (ev.type === "local" && ev.local_code) {
-                    try {
-                        // Provide helpers: state, setState, getState, event, value
-                        var value = domEv.target ? domEv.target.value : undefined;
-                        /* jshint evil:true */
-                        (new Function("state", "setState", "getState", "event", "value",
-                                      ev.local_code))(state, setState, getState, domEv, value);
-                    } catch (e) {
-                        console.warn("Local handler error:", e);
-                    }
-                } else if (ev.type === "agent" && ev.agent_prompt) {
-                    console.log("Agent event - prompt template:", ev.agent_prompt, "result_bind:", ev.result_bind);
-                    var prompt = resolveTemplate(ev.agent_prompt);
-                    console.log("Resolved prompt:", prompt);
-                    // Query for result display element dynamically at click time
-                    var resultEl = ev.result_bind ? document.querySelector(
-                        '[data-state-bind="' + ev.result_bind + '"][data-result-display]') : null;
-                    console.log("Result element found:", resultEl);
-                    callAgent(prompt, ev.result_bind, resultEl);
-                }
+                fireEvent(ev, domEv, context);
             });
         });
+    }
+
+    // Mark a cell as clickable (cursor + hover ring) when it has a click event.
+    function applyClickStyle(cell, events) {
+        if (events && events.click) {
+            cell.classList.add("has-click");
+        }
     }
 
     // ---------------------------------------------------------------------------
@@ -241,7 +260,6 @@
         var rowSpan = layout.rowSpan || layout.row_span || 1;
         var cell = document.createElement("div");
         cell.className = "app-cell";
-        // Explicit placement so components always land on the correct grid row/col
         cell.style.gridColumn = (col + 1) + " / span " + colSpan;
         cell.style.gridRow    = rowSpan > 1
             ? (row + 1) + " / span " + rowSpan
@@ -329,9 +347,10 @@
                     inner.addEventListener("input", function () { setState(comp.bind, inner.value); });
                     registerBinding(comp.bind, function (v) { if (inner.value !== String(v || "")) inner.value = v || ""; });
                 }
-                wireEvents(inner, comp.events, comp);
                 wrapper.appendChild(inner);
                 cell.appendChild(wrapper);
+                wireEvents(cell, comp.events, comp);
+                applyClickStyle(cell, comp.events);
                 return cell;
             }
 
@@ -350,10 +369,12 @@
                 if (comp.bind) {
                     inner.value = state[comp.bind] || "";
                     inner.addEventListener("input", function () { setState(comp.bind, inner.value); });
+                    registerBinding(comp.bind, function (v) { if (inner.value !== String(v || "")) inner.value = String(v || ""); });
                 }
-                wireEvents(inner, comp.events, comp);
                 wrapper.appendChild(inner);
                 cell.appendChild(wrapper);
+                wireEvents(cell, comp.events, comp);
+                applyClickStyle(cell, comp.events);
                 return cell;
             }
 
@@ -377,10 +398,12 @@
                 if (comp.bind) {
                     inner.value = state[comp.bind] || "";
                     inner.addEventListener("change", function () { setState(comp.bind, inner.value); });
+                    registerBinding(comp.bind, function (v) { inner.value = v || ""; });
                 }
-                wireEvents(inner, comp.events, comp);
                 wrapper.appendChild(inner);
                 cell.appendChild(wrapper);
+                wireEvents(cell, comp.events, comp);
+                applyClickStyle(cell, comp.events);
                 return cell;
             }
 
@@ -388,7 +411,6 @@
                 inner = document.createElement("button");
                 inner.className = "app-btn " + (comp.properties.variant || "primary");
                 inner.textContent = comp.label || "Click";
-                // Don't call wireEvents here - it's called at the end of buildComponent
                 break;
             }
 
@@ -403,13 +425,14 @@
                     cb.addEventListener("change", function () { setState(comp.bind, cb.checked); });
                     registerBinding(comp.bind, function (v) { cb.checked = !!v; });
                 }
-                wireEvents(cb, comp.events, comp);
                 var lblEl = document.createElement("span");
                 lblEl.className = "text-sm text-gray-300";
                 lblEl.textContent = comp.label || comp.properties.checked_label || "Enable";
                 wrapper.appendChild(cb);
                 wrapper.appendChild(lblEl);
                 cell.appendChild(wrapper);
+                wireEvents(cell, comp.events, comp);
+                applyClickStyle(cell, comp.events);
                 return cell;
             }
 
@@ -444,17 +467,19 @@
                     valDisplay.textContent = inner.value;
                     inner.addEventListener("input", function () { valDisplay.textContent = inner.value; });
                 }
-                wireEvents(inner, comp.events, comp);
                 row.appendChild(inner);
                 row.appendChild(valDisplay);
                 wrapper.appendChild(row);
                 cell.appendChild(wrapper);
+                wireEvents(cell, comp.events, comp);
+                applyClickStyle(cell, comp.events);
                 return cell;
             }
 
             case "table": {
                 var wrapper = document.createElement("div");
-                wrapper.className = "overflow-x-auto rounded-lg border border-gray-700";
+                wrapper.className = "overflow-auto rounded-lg border border-gray-700";
+                wrapper.style.maxHeight = "24rem";
                 wrapper.setAttribute("data-state-bind", comp.bind || "");
                 var table = document.createElement("table");
                 table.className = "app-table";
@@ -469,6 +494,13 @@
                 thead.appendChild(tr);
                 var tbody = document.createElement("tbody");
 
+                // Interaction config from properties
+                var rowClickable = !!(comp.properties.row_clickable || (comp.events && comp.events.row_click));
+                var rowClickBind = comp.properties.row_click_bind || "";
+                var cellClickBind = comp.properties.cell_click_bind || "";
+                var cellEditable = !!comp.properties.cell_editable;
+                var editableCols = comp.properties.editable_columns || null;
+
                 function renderRows(data) {
                     tbody.innerHTML = "";
                     var rows = Array.isArray(data) ? data : (data ? [data] : []);
@@ -482,13 +514,93 @@
                         tbody.appendChild(emptyTr);
                         return;
                     }
-                    rows.forEach(function (row) {
+                    rows.forEach(function (rowData, rowIndex) {
                         var tr2 = document.createElement("tr");
+
+                        // Row-level click
+                        if (rowClickable) {
+                            tr2.classList.add("row-clickable");
+                            tr2.addEventListener("click", function (domEv) {
+                                // Deselect previous, select current
+                                tbody.querySelectorAll("tr.row-selected").forEach(function(r) { r.classList.remove("row-selected"); });
+                                tr2.classList.add("row-selected");
+                                if (rowClickBind) setState(rowClickBind, rowData);
+                                if (comp.events && comp.events.row_click) {
+                                    fireEvent(comp.events.row_click, domEv, { rowData: rowData, rowIndex: rowIndex });
+                                }
+                            });
+                        }
+
                         cols.forEach(function (col) {
                             var td = document.createElement("td");
                             var key = col.key || col;
-                            var val = typeof row === "object" ? (row[key] != null ? row[key] : "") : row;
-                            td.textContent = typeof val === "object" ? JSON.stringify(val) : String(val);
+                            var rawVal = typeof rowData === "object" ? (rowData[key] != null ? rowData[key] : "") : rowData;
+                            var displayVal = typeof rawVal === "object" ? JSON.stringify(rawVal) : String(rawVal);
+                            td.textContent = displayVal;
+
+                            var isEditable = cellEditable && (!editableCols || editableCols.indexOf(key) !== -1);
+                            var hasCellClick = !!(cellClickBind || (comp.events && comp.events.cell_click));
+
+                            if (isEditable) {
+                                // Inline cell editing
+                                td.classList.add("cell-editable");
+                                (function (capturedKey, capturedRowIndex, capturedRowData) {
+                                    td.addEventListener("click", function (domEv) {
+                                        domEv.stopPropagation();
+                                        if (td.querySelector(".app-table-cell-input")) return;
+                                        var origVal = td.textContent;
+                                        var inp = document.createElement("input");
+                                        inp.className = "app-table-cell-input";
+                                        inp.value = origVal;
+                                        td.textContent = "";
+                                        td.appendChild(inp);
+                                        inp.focus();
+                                        inp.select();
+
+                                        function commitEdit() {
+                                            var newVal = inp.value;
+                                            if (comp.bind && Array.isArray(state[comp.bind])) {
+                                                var arr = state[comp.bind].slice();
+                                                if (typeof arr[capturedRowIndex] === "object" && arr[capturedRowIndex] !== null) {
+                                                    arr[capturedRowIndex] = Object.assign({}, arr[capturedRowIndex]);
+                                                    arr[capturedRowIndex][capturedKey] = newVal;
+                                                } else {
+                                                    arr[capturedRowIndex] = newVal;
+                                                }
+                                                setState(comp.bind, arr);
+                                            } else {
+                                                td.textContent = newVal;
+                                            }
+                                        }
+
+                                        inp.addEventListener("blur", commitEdit);
+                                        inp.addEventListener("keydown", function (e) {
+                                            if (e.key === "Enter") { e.preventDefault(); inp.blur(); }
+                                            if (e.key === "Escape") { td.textContent = origVal; }
+                                        });
+                                    });
+                                })(key, rowIndex, rowData);
+
+                            } else if (hasCellClick) {
+                                // Cell click → state + optional event
+                                td.classList.add("cell-clickable");
+                                (function (capturedKey, capturedRowIndex, capturedDisplayVal, capturedRowData) {
+                                    td.addEventListener("click", function (domEv) {
+                                        domEv.stopPropagation();
+                                        var ctx = {
+                                            rowIndex: capturedRowIndex,
+                                            colKey: capturedKey,
+                                            value: capturedDisplayVal,
+                                            rowData: capturedRowData
+                                        };
+                                        if (cellClickBind) setState(cellClickBind, ctx);
+                                        if (comp.events && comp.events.cell_click) {
+                                            fireEvent(comp.events.cell_click, domEv, ctx);
+                                        }
+                                    });
+                                })(key, rowIndex, displayVal, rowData);
+                            }
+
                             tr2.appendChild(td);
                         });
                         tbody.appendChild(tr2);
@@ -504,6 +616,9 @@
                 table.appendChild(tbody);
                 wrapper.appendChild(table);
                 cell.appendChild(wrapper);
+                // Wire cell-level events (row_click/cell_click are handled above, skipped by wireEvents)
+                wireEvents(cell, comp.events, comp);
+                applyClickStyle(cell, comp.events);
                 return cell;
             }
 
@@ -525,14 +640,29 @@
                 var xKey = comp.properties.x_key || "label";
                 var yKey = comp.properties.y_key || "value";
                 var chartType = comp.properties.chart_type || "bar";
+                var chartClickEv = comp.events && comp.events.click ? comp.events.click : null;
 
                 function renderChart(data) {
                     var rows = Array.isArray(data) ? data : [];
                     var labels = rows.map(function (r) { return r[xKey] != null ? String(r[xKey]) : ""; });
                     var values = rows.map(function (r) { return Number(r[yKey]) || 0; });
+
+                    // Chart.js onClick — passes data point context to the event handler
+                    var onClickFn = chartClickEv ? function (event, elements) {
+                        if (!elements.length) return;
+                        var el = elements[0];
+                        var ctx = {
+                            dataIndex: el.index,
+                            label: labels[el.index] || "",
+                            value: values[el.index] || 0
+                        };
+                        fireEvent(chartClickEv, event, ctx);
+                    } : undefined;
+
                     if (chartInst) {
                         chartInst.data.labels = labels;
                         chartInst.data.datasets[0].data = values;
+                        if (onClickFn) chartInst.options.onClick = onClickFn;
                         chartInst.update();
                     } else {
                         chartInst = new Chart(canvas, {
@@ -549,6 +679,7 @@
                             },
                             options: {
                                 responsive: true,
+                                onClick: onClickFn,
                                 plugins: { legend: { labels: { color: "#9ca3af" } } },
                                 scales: chartType !== "pie" ? {
                                     x: { ticks: { color: "#9ca3af" }, grid: { color: "#374151" } },
@@ -556,6 +687,7 @@
                                 } : undefined,
                             },
                         });
+                        if (chartClickEv) canvas.style.cursor = "pointer";
                     }
                 }
 
@@ -563,6 +695,14 @@
                     registerBinding(comp.bind, renderChart);
                     renderChart(state[comp.bind] || []);
                 }
+                // Wire non-click events to cell; chart click is handled via Chart.js onClick above
+                var nonClickEvents = {};
+                if (comp.events) {
+                    Object.keys(comp.events).forEach(function (k) {
+                        if (k !== "click") nonClickEvents[k] = comp.events[k];
+                    });
+                }
+                wireEvents(cell, nonClickEvents, comp);
                 return cell;
             }
 
@@ -571,7 +711,6 @@
                 var color = comp.properties.color || "";
                 inner.className = "app-card" + (color ? " color-" + color : "");
 
-                // Subtle gradient overlay
                 if (color) {
                     var overlay = document.createElement("div");
                     overlay.className = "app-card-overlay color-" + color;
@@ -581,7 +720,6 @@
                 var content = document.createElement("div");
                 content.className = "app-card-content";
 
-                // Header: optional icon + title
                 if (comp.properties.icon || comp.properties.title) {
                     var header = document.createElement("div");
                     header.className = "app-card-header";
@@ -612,7 +750,6 @@
                 });
                 content.appendChild(bodyEl);
                 inner.appendChild(content);
-                // Don't call wireEvents here - it's called at the end of buildComponent
                 break;
             }
 
@@ -678,10 +815,13 @@
             }
         }
 
+        // Universal tail — runs for all components that set `inner` without early-returning.
+        // Events are wired to the outer cell so ANY component type can act as an interactive trigger.
         if (inner) {
-            wireEvents(inner, comp.events, comp);
             cell.appendChild(inner);
         }
+        wireEvents(cell, comp.events, comp);
+        applyClickStyle(cell, comp.events);
         return cell;
     }
 

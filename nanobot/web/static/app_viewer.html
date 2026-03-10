@@ -114,8 +114,9 @@
         .app-comp-heading { color: var(--app-heading, #f9fafb); }
 
         .app-table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
-        .app-table th { background: rgba(255,255,255,0.05); font-weight: 600; text-align: left;
-                        padding: 0.6rem 0.75rem; border-bottom: 1px solid var(--app-border,#374151); color: var(--app-text-muted,#d1d5db); }
+        .app-table th { background: #1e2533; font-weight: 600; text-align: left;
+                        padding: 0.6rem 0.75rem; border-bottom: 1px solid var(--app-border,#374151); color: var(--app-text-muted,#d1d5db);
+                        position: sticky; top: 0; z-index: 1; }
         .app-table td { padding: 0.55rem 0.75rem; border-bottom: 1px solid var(--app-surface,#1f2937); color: var(--app-text,#e5e7eb); }
         .app-table tr:last-child td { border-bottom: none; }
         .app-table tr:hover td { background: rgba(255,255,255,0.03); }
@@ -158,7 +159,7 @@
         }
         body.app-theme-light .app-label { color: #6B7280; }
         body.app-theme-light .app-result-box { border-color: #E5E7EB; color: #374151; }
-        body.app-theme-light .app-table th { background: rgba(0,0,0,0.04); color: #374151; border-color: #E5E7EB; }
+        body.app-theme-light .app-table th { background: #f9fafb; color: #374151; border-color: #E5E7EB; }
         body.app-theme-light .app-table td { color: #111827; border-color: #F3F4F6; }
         body.app-theme-light .app-table tr:hover td { background: rgba(0,0,0,0.02); }
         body.app-theme-light .app-divider { border-color: #E5E7EB; }
@@ -213,6 +214,34 @@
         .app-stat-number { font-size: 3.5rem; font-weight: 800; line-height: 1.1; margin-bottom: 0.4rem; }
         .app-stat-label  { font-size: 1rem; font-weight: 600; color: var(--app-text, inherit); }
         .app-stat-desc   { font-size: 0.8125rem; margin-top: 0.25rem; color: var(--app-text-muted, #6B7280); }
+
+        /* ── Universal clickable component cell ─────────────────────── */
+        /* Any component with events.click gets this hover ring */
+        .app-cell.has-click { cursor: pointer; }
+        .app-cell.has-click:hover { outline: 1px solid var(--app-border, #4b5563); border-radius: 0.5rem; }
+
+        /* ── Clickable / selectable table rows ───────────────────────── */
+        .app-table tr.row-clickable { cursor: pointer; }
+        .app-table tr.row-clickable:hover td { background: rgba(255,255,255,0.06); }
+        .app-table tr.row-selected td { background: rgba(59,130,246,0.12); }
+
+        /* ── Clickable / editable table cells ────────────────────────── */
+        .app-table td.cell-clickable { cursor: pointer; }
+        .app-table td.cell-clickable:hover { background: rgba(59,130,246,0.1); }
+        .app-table td.cell-editable { cursor: text; }
+        .app-table td.cell-editable:hover { background: rgba(59,130,246,0.08); outline: 1px dashed var(--app-border, #4b5563); outline-offset: -1px; }
+
+        /* Inline cell edit input */
+        .app-table-cell-input {
+            background: transparent;
+            color: inherit;
+            border: none;
+            outline: none;
+            width: 100%;
+            font-size: inherit;
+            padding: 0;
+            font-family: inherit;
+        }
 
         /* ── Feedback section ────────────────────────────────────────── */
         .feedback-section {

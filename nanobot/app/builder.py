@@ -116,6 +116,22 @@ Use this exact structure:
       }}
     }},
     {{
+      "id": "card-action",
+      "type": "card",
+      "label": "",
+      "properties": {{"title": "Quick Action", "body": "Click to run analysis", "icon": "fa-solid fa-bolt", "color": "blue"}},
+      "layout": {{"row": 2, "col": 0, "colSpan": 4}},
+      "bind": "",
+      "events": {{
+        "click": {{
+          "type": "local",
+          "local_code": "setState('inputText', 'Run analysis')",
+          "agent_prompt": "",
+          "result_bind": ""
+        }}
+      }}
+    }},
+    {{
       "id": "results-1",
       "type": "text",
       "label": "Results",
@@ -129,26 +145,82 @@ Use this exact structure:
 
 ## Component Types & Their Properties
 
+**Every component type supports an `events` object** — not just buttons. \
+Any component can be clicked, hovered, or interacted with to trigger local logic or agent calls. \
+Use this to make cards, stat tiles, table rows, chart bars, images, and text blocks interactive.
+
 - **heading**: `{{"level": 1-3, "text": "Title"}}`
-- **text**: `{{"content": "Static or bound text"}}` — if `bind` is set, shows state value
+- **text**: `{{"content": "Static or bound text"}}` — if `bind` is set, shows state value; \
+  add `events.click` to make the text block a clickable trigger
 - **input**: `{{"placeholder": "...", "inputType": "text|number|email|password"}}`
 - **textarea**: `{{"placeholder": "...", "rows": 4}}`
 - **select**: `{{"options": [{{"value": "v", "label": "L"}}]}}`
-- **button**: `{{"variant": "primary|secondary|danger"}}`
+- **button**: `{{"variant": "primary|secondary|danger"}}` — the canonical click trigger, \
+  but any other component can serve the same role via `events.click`
 - **checkbox**: `{{"checked_label": "Enabled", "unchecked_label": "Disabled"}}`
 - **slider**: `{{"min": 0, "max": 100, "step": 1}}`
-- **table**: `{{"columns": [{{"key": "col", "label": "Column Header"}}]}}` — bind to array state var
-- **chart**: `{{"chart_type": "bar|line|pie", "x_key": "label", "y_key": "value"}}` — bind to array
-- **card**: `{{"title": "Card title", "body": "Card body text", "icon": "fa-solid fa-<name>", "color": "blue|purple|teal|rose|amber"}}` — color adds gradient accent and colored title; can have click event
-- **stat**: `{{"number": "98%", "stat_label": "Projects completed", "description": "Optional detail text", "color": "blue|purple|teal|rose|amber"}}` — large-number highlight card, ideal for key metrics
+- **table**: `{{"columns": [{{"key": "col", "label": "Column Header"}}]}}` — bind to array state var; \
+  supports rich sub-element interaction (see Table Interaction below)
+- **chart**: `{{"chart_type": "bar|line|pie", "x_key": "label", "y_key": "value"}}` — bind to array; \
+  `events.click` fires when a data point is clicked, with `context.label` and `context.value`
+- **card**: `{{"title": "Card title", "body": "Card body text", "icon": "fa-solid fa-<name>", \
+  "color": "blue|purple|teal|rose|amber"}}` — ideal clickable tile; add `events.click` to make it \
+  a navigation or selection trigger
+- **stat**: `{{"number": "98%", "stat_label": "...", "description": "...", \
+  "color": "blue|purple|teal|rose|amber"}}` — large-number highlight; add `events.click` to drill down
+- **image**: `{{"src": "url"}}` — add `events.click` to make images interactive
 - **divider**: no properties needed
+
+## Table Interaction Properties
+
+Tables support richer interaction beyond the whole-table `events.click`:
+
+- `"row_clickable": true` — rows get a hover highlight and pointer cursor
+- `"row_click_bind": "selectedRow"` — clicking a row stores the full row object into this state var
+- `"cell_click_bind": "selectedCell"` — clicking a cell stores `{{rowIndex, colKey, value, rowData}}`
+- `"cell_editable": true` — clicking a cell opens an inline text input; \
+  on Enter/blur the value is saved back into the bound array state var
+- `"editable_columns": ["name", "price"]` — optional whitelist; only these columns are editable
+
+Table event names (in addition to `"click"` on the whole table):
+- `"row_click"` — fires per row; receives `context.rowData` and `context.rowIndex`
+- `"cell_click"` — fires per cell; receives `context.value`, `context.colKey`, \
+  `context.rowIndex`, `context.rowData`
 
 ## Event Types
 
-- **local**: `"local_code"` contains a JS expression. Use `state.varName` to read state. \
-  Use `setState('varName', value)` to update. Use `event.target.value` for input value.
-- **agent**: `"agent_prompt"` is a template where `{{{{state.varName}}}}` is replaced \
-  with current state values. `"result_bind"` names the state variable to store the response.
+All components support `events`. Common event names: `"click"`, `"change"`, `"submit"`. \
+Table extras: `"row_click"`, `"cell_click"`.
+
+- **local**: `"local_code"` is a JS snippet. Available variables: \
+  `state` (full state object), `setState(name, value)`, `getState(name)`, \
+  `event` (DOM event), `value` (shortcut for event.target.value), \
+  `context` (sub-element context — see below).
+- **agent**: `"agent_prompt"` is a template. Use `{{{{state.varName}}}}` to interpolate state \
+  and `{{{{context.field}}}}` to interpolate sub-element context. \
+  `"result_bind"` names the state variable to store the agent response.
+
+### The `context` object
+
+`context` is populated automatically for sub-element events and chart clicks:
+
+| Event | context fields |
+|-------|---------------|
+| `row_click` | `context.rowData` (object), `context.rowIndex` |
+| `cell_click` | `context.value`, `context.colKey`, `context.rowIndex`, `context.rowData` |
+| chart `click` | `context.label`, `context.value`, `context.dataIndex` |
+| all others | `context` is `{{}}` — use `state.*` for data |
+
+Example — card click populates a form field:
+```
+"events": {{"click": {{"type": "local", "local_code": "setState('query', 'topic A')"}}}}
+```
+Example — table row click feeds an agent prompt:
+```
+"events": {{"row_click": {{"type": "agent",
+  "agent_prompt": "Summarise this record: {{{{context.rowData}}}}",
+  "result_bind": "rowSummary", "local_code": ""}}}}
+```
 
 ## Layout Rules
 
@@ -163,9 +235,12 @@ Use this exact structure:
 - Use `layout.type = "dashboard"` for complex multi-panel apps, `"single-page"` otherwise
 - Use `layout.theme = "light"` for informational/report pages (white background, color-accented cards); use `"dark"` for tool/productivity apps
 - For light-theme dashboard pages, prefer **card** and **stat** components with `color` set to one of: blue, purple, teal, rose, amber
-- Prefer agent events for AI-driven features; local events for simple UI changes
+- **Any component can be interactive** — prefer agent events for AI-driven features; local events for simple UI state changes
+- Use `events.click` on cards and stat tiles to act as selection or navigation triggers instead of buttons
+- For tables: use `row_clickable` + `row_click_bind` to drive detail panels; use `cell_editable` for in-place editing
+- For charts: `events.click` fires with the clicked data point's label and value in `context`
 - For tables and charts, always bind to an array state variable
-- `agent_prompt` template variables use double curly braces: `{{{{state.varName}}}}`
+- `agent_prompt` template variables use double curly braces: `{{{{state.varName}}}}`, `{{{{context.field}}}}`
 - Keep the app focused; 4–12 components is typical
 - State variable names must be camelCase with no spaces
 """
